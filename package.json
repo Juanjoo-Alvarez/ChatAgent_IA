@@ -1,0 +1,11 @@
+{
+  "name": "agichat-widget-sdk",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "build": "pnpm --filter @agichat/core build",
+    "test": "pnpm --filter @agichat/core test",
+    "test:coverage": "pnpm --filter @agichat/core test:coverage",
+    "typecheck": "pnpm --filter @agichat/core typecheck"
+  }
+}
