@@ -1,4 +1,4 @@
-import { Message, type MessageStatus } from "./Message";
+import type { Message, MessageStatus } from "./Message";
 
 export class Conversation {
   private readonly messagesById = new Map<string, Message>();
