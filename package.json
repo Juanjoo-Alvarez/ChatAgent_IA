@@ -3,9 +3,15 @@
   "private": true,
   "packageManager": "pnpm@11.19.0",
   "scripts": {
-    "build": "pnpm --filter @agichat/core build",
-    "test": "pnpm --filter @agichat/core test",
-    "test:coverage": "pnpm --filter @agichat/core test:coverage",
-    "typecheck": "pnpm --filter @agichat/core typecheck"
+    "build": "pnpm --recursive --if-present run build",
+    "lint": "eslint . --max-warnings 0",
+    "test": "pnpm --recursive --if-present run test",
+    "test:coverage": "pnpm --recursive --if-present run test:coverage",
+    "typecheck": "pnpm --recursive --if-present run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.9.1",
+    "typescript-eslint": "^8.69.0"
   }
 }

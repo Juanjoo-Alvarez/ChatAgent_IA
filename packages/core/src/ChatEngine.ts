@@ -1,6 +1,6 @@
 import { Conversation } from "./domain/Conversation";
 import { Message } from "./domain/Message";
-import { Session } from "./domain/Session";
+import type { Session } from "./domain/Session";
 import type {
   ITransportAdapter,
   TransportEvent
