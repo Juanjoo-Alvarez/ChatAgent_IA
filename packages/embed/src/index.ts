@@ -1,4 +1,11 @@
-export const AGICHAT_WIDGET_TAG = "agi-chat-widget" as const;
+import { registerAGIChatWidget } from "./AGIChatWidgetElement";
+
+export {
+  AGIChatWidgetElement,
+  registerAGIChatWidget,
+  type AGIChatTransport
+} from "./AGIChatWidgetElement";
+export { AGICHAT_WIDGET_TAG } from "./constants";
 
 export {
   mountChatWidget,
@@ -7,3 +14,7 @@ export {
   type UnmountChatWidget
 } from "./mountChatWidget";
 export type { ChatWidgetProps } from "@agichat/react";
+
+if (typeof globalThis.customElements !== "undefined") {
+  registerAGIChatWidget(globalThis.customElements);
+}
