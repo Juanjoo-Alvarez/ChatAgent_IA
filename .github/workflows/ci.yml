@@ -43,6 +43,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Build
+        run: pnpm build
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -57,9 +60,6 @@ jobs:
           path: packages/*/coverage
           if-no-files-found: warn
           retention-days: 7
-
-      - name: Build
-        run: pnpm build
 
       - name: Upload build output
         uses: actions/upload-artifact@v7
