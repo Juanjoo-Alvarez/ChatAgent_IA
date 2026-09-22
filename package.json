@@ -1,10 +1,12 @@
 {
   "name": "agichat-widget-sdk",
+  "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "build": "pnpm --recursive --if-present run build",
     "lint": "eslint . --max-warnings 0",
+    "release:prepare": "pnpm build && node scripts/prepare-release.mjs",
     "test": "pnpm --recursive --if-present run test",
     "test:coverage": "pnpm --recursive --if-present run test:coverage",
     "typecheck": "pnpm --recursive --if-present run typecheck"
