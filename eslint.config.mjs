@@ -6,7 +6,8 @@ export default tseslint.config(
     ignores: [
       "**/coverage/**",
       "**/dist/**",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "**/release-artifacts/**"
     ]
   },
   eslint.configs.recommended,
