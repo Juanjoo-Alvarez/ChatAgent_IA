@@ -245,14 +245,4 @@ pnpm --filter @agichat/demo dev
 Detalle de cada escenario y otros comandos (`typecheck`, `build`, `preview`)
 en [`apps/demo/README.md`](apps/demo/README.md).
 
-## 11. Pendientes
 
-Estas secciones no se documentan todavía porque dependen de trabajo en
-curso de otras partes del equipo o de contenido que aún no existe en el
-repo. Se dejan marcadas aquí en vez de inventar contenido:
-
-- **Diagrama de arquitectura (Mermaid.js)**: no existe todavía un `.md`
-  general de arquitectura del proyecto que se pueda enlazar desde aquí.
-- **Capturas de pantalla del widget**: el tema visual (`packages/react/theme.ts`)
-  ya está implementado y aplicado a los componentes, pero faltan capturas
-  reales para incluir en este README.
