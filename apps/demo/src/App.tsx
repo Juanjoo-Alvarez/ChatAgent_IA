@@ -1,19 +1,29 @@
 import { useEffect, useState, type ReactElement } from "react";
 
 import { ChatWidget } from "@agichat/react";
-import type { ITransportAdapter } from "@agichat/core";
+import type { MockTransportAdapter } from "@agichat/react";
 
-import { demoScenarios, defaultScenario, findScenario } from "./scenarios";
+import { demoScenarios, defaultScenario, findScenario, type DemoScenario } from "./scenarios";
 
-export const App = (): ReactElement => {
-  const [scenarioId, setScenarioId] = useState(defaultScenario.id);
-  const scenario = findScenario(scenarioId);
+interface ScenarioChatWidgetProps {
+  readonly scenario: DemoScenario;
+}
 
-  const [transport, setTransport] = useState<ITransportAdapter | null>(null);
+/**
+ * Instancia dedicada por escenario. El padre la monta con `key={scenario.id}`,
+ * así que React la desmonta y crea una nueva por completo en cada cambio de
+ * pestaña, en vez de re-renderizarla con un `transport` distinto: eso evita
+ * que `ChatWidget` (vía `useChat`) intente re-suscribirse a un transporte que
+ * el padre ya empezó a liberar en un efecto separado.
+ */
+const ScenarioChatWidget = ({ scenario }: ScenarioChatWidgetProps): ReactElement | null => {
+  const [transport, setTransport] = useState<MockTransportAdapter | null>(null);
 
   useEffect(() => {
-    // Cada escenario es dueño de su propio MockTransportAdapter: se crea al
-    // activarse y se libera al cambiar de escenario o desmontar la demo.
+    // El transporte se crea dentro del efecto (no en el render ni en un
+    // inicializador de estado) para que el doble montaje de React Strict
+    // Mode en desarrollo cree una instancia nueva en cada pasada en vez de
+    // reutilizar una que su propia limpieza ya haya liberado.
     const created = scenario.createTransport();
     setTransport(created);
 
@@ -21,6 +31,27 @@ export const App = (): ReactElement => {
       created.dispose();
     };
   }, [scenario]);
+
+  if (transport === null) {
+    return null;
+  }
+
+  return (
+    <ChatWidget
+      transport={transport}
+      sessionId={scenario.id}
+      title={scenario.title}
+      {...(scenario.placeholder !== undefined
+        ? { placeholder: scenario.placeholder }
+        : {})}
+      {...(scenario.theme !== undefined ? { theme: scenario.theme } : {})}
+    />
+  );
+};
+
+export const App = (): ReactElement => {
+  const [scenarioId, setScenarioId] = useState(defaultScenario.id);
+  const scenario = findScenario(scenarioId);
 
   return (
     <main className="demo-layout">
@@ -49,19 +80,7 @@ export const App = (): ReactElement => {
       <p className="demo-description">{scenario.description}</p>
 
       <section className="demo-widget">
-        {transport !== null && (
-          <ChatWidget
-            transport={transport}
-            sessionId={scenario.id}
-            title={scenario.title}
-            {...(scenario.placeholder !== undefined
-              ? { placeholder: scenario.placeholder }
-              : {})}
-            {...(scenario.theme !== undefined
-              ? { theme: scenario.theme }
-              : {})}
-          />
-        )}
+        <ScenarioChatWidget key={scenario.id} scenario={scenario} />
       </section>
 
       <footer className="demo-footer">
