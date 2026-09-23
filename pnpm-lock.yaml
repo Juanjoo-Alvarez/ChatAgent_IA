@@ -132,9 +132,15 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^3.2.4
+        version: 3.2.7(supports-color@7.2.0)(vitest@3.2.7(@types/debug@4.1.13)(jsdom@25.0.1(supports-color@7.2.0))(lightningcss@1.33.0)(supports-color@7.2.0))
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/debug@4.1.13)(jsdom@25.0.1(supports-color@7.2.0))(lightningcss@1.33.0)(supports-color@7.2.0)
 
 packages:
 
