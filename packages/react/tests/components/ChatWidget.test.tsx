@@ -18,6 +18,27 @@ describe("ChatWidget", () => {
     render(<ChatWidget transport={new FakeTransportAdapter()} title="Soporte AGIChat" />);
 
     expect(screen.getByText("Soporte AGIChat")).toBeInTheDocument();
+    expect(screen.getByTestId("header-avatar").querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("Asistente virtual · En línea")).toBeInTheDocument();
+  });
+
+  it("applies theme overrides while preserving default tokens", () => {
+    render(
+      <ChatWidget
+        transport={new FakeTransportAdapter()}
+        theme={{
+          widgetBackground: "#fff7ed",
+          headerBackground: "#7c2d12"
+        }}
+      />
+    );
+
+    expect(screen.getByTestId("chat-widget")).toHaveStyle({
+      backgroundColor: "#fff7ed"
+    });
+    expect(screen.getByText("AGIChat").closest("header")).toHaveStyle({
+      background: "#7c2d12"
+    });
   });
 
   it("sends a message through InputBar and renders it in the message list", async () => {
@@ -59,6 +80,9 @@ describe("ChatWidget", () => {
     });
 
     expect(screen.getByText("El agente está escribiendo…")).toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "El agente está escribiendo" })
+    ).toBeInTheDocument();
   });
 
   it("shows an error state when sending a message fails", async () => {

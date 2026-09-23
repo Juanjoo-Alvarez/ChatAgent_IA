@@ -1,54 +1,79 @@
 import { useState } from "react";
 import type { CSSProperties, KeyboardEvent, ReactElement } from "react";
 
-import { defaultTheme } from "../../theme";
+import {
+  resolveTheme,
+  type AGIChatTheme,
+  type AGIChatThemeOverride
+} from "../../theme";
+import { SendIcon } from "../icons";
 
 export interface InputBarProps {
   readonly onSend: (text: string) => void;
   readonly disabled?: boolean;
   readonly placeholder?: string;
+  readonly theme?: AGIChatThemeOverride;
 }
 
-const formStyle: CSSProperties = {
+const formStyle = (theme: AGIChatTheme): CSSProperties => ({
   display: "flex",
-  gap: 8,
-  alignItems: "flex-end",
-  padding: 8,
-  borderTop: `1px solid ${defaultTheme.inputBorder}`,
-  backgroundColor: defaultTheme.inputBackground
-};
+  gap: theme.spacingSmall + 2,
+  alignItems: "center",
+  padding: `${theme.spacingMedium}px ${theme.spacingMedium + 2}px`,
+  borderTop: `1px solid ${theme.inputBorder}`,
+  backgroundColor: theme.inputBackground
+});
 
-const textareaStyle: CSSProperties = {
+const textareaStyle = (
+  theme: AGIChatTheme,
+  isFocused: boolean
+): CSSProperties => ({
   flex: 1,
   resize: "none",
-  minHeight: 40,
+  boxSizing: "border-box",
+  minHeight: 44,
   maxHeight: 120,
-  padding: "8px 10px",
-  borderRadius: 10,
-  border: `1px solid ${defaultTheme.inputBorder}`,
-  fontFamily: defaultTheme.fontFamily,
-  fontSize: 14,
-  lineHeight: 1.4
-};
+  padding: "10px 12px",
+  borderRadius: theme.controlRadius,
+  border: `1px solid ${theme.inputBorder}`,
+  outline: "none",
+  backgroundColor: theme.widgetBackground,
+  color: theme.inputText,
+  fontFamily: theme.fontFamily,
+  fontSize: theme.fontSize,
+  lineHeight: 1.45,
+  boxShadow: isFocused ? `0 0 0 3px ${theme.focusRing}` : "none"
+});
 
-const buttonStyle = (isDisabled: boolean): CSSProperties => ({
-  padding: "8px 16px",
-  borderRadius: 10,
+const buttonStyle = (
+  theme: AGIChatTheme,
+  isDisabled: boolean
+): CSSProperties => ({
+  display: "grid",
+  placeItems: "center",
+  flex: "0 0 auto",
+  width: 44,
+  height: 44,
+  padding: 0,
+  borderRadius: theme.controlRadius,
   border: "none",
-  backgroundColor: defaultTheme.accent,
-  color: defaultTheme.accentText,
-  fontSize: 14,
-  fontWeight: 600,
+  backgroundColor: theme.accent,
+  color: theme.accentText,
   cursor: isDisabled ? "not-allowed" : "pointer",
-  opacity: isDisabled ? 0.6 : 1
+  opacity: isDisabled ? 0.5 : 1,
+  boxShadow: isDisabled ? "none" : `0 8px 18px ${theme.focusRing}`,
+  transition: "opacity 150ms ease, transform 150ms ease"
 });
 
 export const InputBar = ({
   onSend,
   disabled = false,
-  placeholder = "Escribe un mensaje…"
+  placeholder = "Escribe un mensaje…",
+  theme: themeOverride
 }: InputBarProps): ReactElement => {
+  const theme = resolveTheme(themeOverride);
   const [value, setValue] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
 
   const trySend = (): void => {
     const trimmed = value.trim();
@@ -73,7 +98,7 @@ export const InputBar = ({
   return (
     <form
       className="agichat-input-bar"
-      style={formStyle}
+      style={formStyle(theme)}
       onSubmit={(event) => {
         event.preventDefault();
         trySend();
@@ -81,21 +106,25 @@ export const InputBar = ({
     >
       <textarea
         className="agichat-input-bar__textarea"
-        style={textareaStyle}
+        style={textareaStyle(theme, isFocused)}
         value={value}
         placeholder={placeholder}
         disabled={disabled}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handleKeyDown}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         aria-label="Mensaje"
       />
       <button
         type="submit"
         className="agichat-input-bar__send"
-        style={buttonStyle(isSendDisabled)}
+        style={buttonStyle(theme, isSendDisabled)}
         disabled={isSendDisabled}
+        aria-label="Enviar"
+        title="Enviar mensaje"
       >
-        Enviar
+        <SendIcon />
       </button>
     </form>
   );

@@ -7,6 +7,7 @@ import { AGICHAT_WIDGET_TAG } from "./constants";
 import { mountChatWidget, type UnmountChatWidget } from "./mountChatWidget";
 
 export type AGIChatTransport = ChatWidgetProps["transport"];
+export type AGIChatWidgetTheme = NonNullable<ChatWidgetProps["theme"]>;
 
 const hostStyles = `
   :host {
@@ -29,6 +30,7 @@ export class AGIChatWidgetElement extends HTMLElement {
   private unmountWidget: UnmountChatWidget | undefined;
   private injectedTransport: AGIChatTransport | undefined;
   private ownedTransport: MockTransportAdapter | undefined;
+  private themeOverride: AGIChatWidgetTheme | undefined;
 
   public constructor() {
     super();
@@ -54,6 +56,22 @@ export class AGIChatWidgetElement extends HTMLElement {
 
     this.disposeOwnedTransport();
     this.injectedTransport = value;
+
+    if (this.isConnected) {
+      this.renderWidget();
+    }
+  }
+
+  public get theme(): AGIChatWidgetTheme | undefined {
+    return this.themeOverride;
+  }
+
+  public set theme(value: AGIChatWidgetTheme | undefined) {
+    if (this.themeOverride === value) {
+      return;
+    }
+
+    this.themeOverride = value;
 
     if (this.isConnected) {
       this.renderWidget();
@@ -101,7 +119,8 @@ export class AGIChatWidgetElement extends HTMLElement {
         ? { sessionId }
         : {}),
       ...(placeholder !== null ? { placeholder } : {}),
-      ...(emptyStateMessage !== null ? { emptyStateMessage } : {})
+      ...(emptyStateMessage !== null ? { emptyStateMessage } : {}),
+      ...(this.themeOverride !== undefined ? { theme: this.themeOverride } : {})
     });
   }
 

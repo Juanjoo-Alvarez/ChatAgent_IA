@@ -3,4 +3,9 @@ export { MessageBubble, type MessageBubbleProps } from "./components/MessageBubb
 export { InputBar, type InputBarProps } from "./components/InputBar/InputBar";
 export { useChat, type UseChatOptions, type UseChatResult } from "./hooks/useChat";
 export { MockTransportAdapter, type MockTransportAdapterOptions } from "./mocks/MockTransportAdapter";
-export { defaultTheme, type AGIChatTheme } from "./theme";
+export {
+  defaultTheme,
+  resolveTheme,
+  type AGIChatTheme,
+  type AGIChatThemeOverride
+} from "./theme";

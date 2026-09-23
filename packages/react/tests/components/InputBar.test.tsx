@@ -80,4 +80,33 @@ describe("InputBar", () => {
 
     expect(screen.getByPlaceholderText("Pregúntame algo…")).toBeInTheDocument();
   });
+
+  it("uses an accessible send icon and accepts theme overrides", () => {
+    render(
+      <InputBar
+        onSend={vi.fn()}
+        theme={{ accent: "#0f766e", inputBackground: "#f0fdfa" }}
+      />
+    );
+
+    const button = screen.getByRole("button", { name: "Enviar" });
+    expect(button.querySelector("svg")).not.toBeNull();
+    expect(button).toHaveAttribute("title", "Enviar mensaje");
+    expect(button).toHaveStyle({ backgroundColor: "#0f766e" });
+    expect(button.closest("form")).toHaveStyle({ backgroundColor: "#f0fdfa" });
+  });
+
+  it("shows the focus ring only while the message field is focused", async () => {
+    const user = userEvent.setup();
+    render(<InputBar onSend={vi.fn()} theme={{ focusRing: "rgb(1, 2, 3)" }} />);
+
+    const textbox = screen.getByRole("textbox", { name: "Mensaje" });
+    expect(textbox).toHaveStyle({ boxShadow: "none" });
+
+    await user.click(textbox);
+    expect(textbox).toHaveStyle({ boxShadow: "0 0 0 3px rgb(1, 2, 3)" });
+
+    await user.tab();
+    expect(textbox).toHaveStyle({ boxShadow: "none" });
+  });
 });
