@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AGIChat Widget SDK — Demo (Web Component)</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="demo-layout">
+      <header class="demo-header">
+        <h1>AGIChat Widget SDK — Web Component</h1>
+        <p>
+          La misma demo, integrada sin React con
+          <code>&lt;agi-chat-widget&gt;</code> de <code>@agichat/embed</code>.
+        </p>
+      </header>
+
+      <nav class="demo-tabs" aria-label="Casos de uso de la demo" id="tabs"></nav>
+
+      <p class="demo-description" id="description"></p>
+
+      <section class="demo-widget">
+        <agi-chat-widget id="widget"></agi-chat-widget>
+      </section>
+
+      <footer class="demo-footer">
+        <p>
+          ¿Prefieres verlo integrado con React?
+          <a href="./index.html">Ver la demo en index.html</a>.
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="/src/web-component.ts"></script>
+  </body>
+</html>

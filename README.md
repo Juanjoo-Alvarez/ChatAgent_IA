@@ -230,7 +230,20 @@ herramientas de codeo agéntico: [`AGENTS.md`](AGENTS.md).
 
 ## 10. Demo
 
-`apps/demo` todavía no existe en el repo — ver [Pendientes](#11-pendientes).
+[`apps/demo`](apps/demo) es una aplicación de demostración con cuatro casos
+de uso sobre `MockTransportAdapter` (chat básico, error, timeout y tema
+personalizado), integrados de dos formas: con `ChatWidget` de
+`@agichat/react` (`index.html`) y con el Web Component `<agi-chat-widget>`
+de `@agichat/embed`, sin React (`web-component.html`).
+
+```bash
+pnpm install
+pnpm build
+pnpm --filter @agichat/demo dev
+```
+
+Detalle de cada escenario y otros comandos (`typecheck`, `build`, `preview`)
+en [`apps/demo/README.md`](apps/demo/README.md).
 
 ## 11. Pendientes
 
@@ -243,5 +256,3 @@ repo. Se dejan marcadas aquí en vez de inventar contenido:
 - **Capturas de pantalla del widget**: el tema visual (`packages/react/theme.ts`)
   ya está implementado y aplicado a los componentes, pero faltan capturas
   reales para incluir en este README.
-- **`apps/demo`**: falta crear la carpeta con la aplicación de demostración y
-  sus casos de uso de muestra.
