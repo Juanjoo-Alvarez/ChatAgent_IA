@@ -3,7 +3,8 @@ import { registerAGIChatWidget } from "./AGIChatWidgetElement";
 export {
   AGIChatWidgetElement,
   registerAGIChatWidget,
-  type AGIChatTransport
+  type AGIChatTransport,
+  type AGIChatWidgetTheme
 } from "./AGIChatWidgetElement";
 export { AGICHAT_WIDGET_TAG } from "./constants";
 

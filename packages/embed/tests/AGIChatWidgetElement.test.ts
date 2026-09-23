@@ -65,6 +65,27 @@ describe("AGIChatWidgetElement", () => {
     expect(element.shadowRoot?.textContent).toContain("Updated title");
   });
 
+  it("applies a theme configured through the element property", () => {
+    const element = new AGIChatWidgetElement();
+    element.theme = {
+      widgetBackground: "#fff7ed",
+      headerBackground: "#7c2d12"
+    };
+
+    appendWidget(element);
+
+    const widget = element.shadowRoot?.querySelector<HTMLElement>(
+      "[data-testid='chat-widget']"
+    );
+    expect(widget?.style.backgroundColor).toBe("rgb(255, 247, 237)");
+
+    act(() => {
+      element.theme = { accent: "#0f766e" };
+    });
+
+    expect(element.theme).toEqual({ accent: "#0f766e" });
+  });
+
   it("uses an injected transport without taking ownership of it", () => {
     const element = new AGIChatWidgetElement();
     const dispose = vi.fn();

@@ -34,6 +34,32 @@ describe("MessageBubble", () => {
     const bubble = screen.getByTestId("message-bubble");
     expect(bubble).toHaveAttribute("data-role", "agent");
     expect(screen.getByText("¡Hola! ¿En qué te ayudo?")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-avatar").querySelector("svg")).not.toBeNull();
+  });
+
+  it("does not render an agent avatar next to user messages", () => {
+    render(<MessageBubble message={buildMessage({ role: "user" })} />);
+
+    expect(screen.queryByTestId("agent-avatar")).not.toBeInTheDocument();
+  });
+
+  it("applies custom bubble and avatar colors", () => {
+    render(
+      <MessageBubble
+        message={buildMessage({ role: "agent" })}
+        theme={{
+          agentBubbleBackground: "#ecfeff",
+          agentAvatarBackground: "#cffafe"
+        }}
+      />
+    );
+
+    expect(screen.getByRole("article", { name: "Mensaje del agente" })).toHaveStyle({
+      backgroundColor: "#ecfeff"
+    });
+    expect(screen.getByTestId("agent-avatar")).toHaveStyle({
+      backgroundColor: "#cffafe"
+    });
   });
 
   it("visually differentiates user and agent messages via distinct bubble roles", () => {
