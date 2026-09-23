@@ -62,4 +62,88 @@ describe("MessageBubble", () => {
     expect(screen.queryByText("Enviando…")).not.toBeInTheDocument();
     expect(screen.queryByText("No se pudo enviar el mensaje.")).not.toBeInTheDocument();
   });
+
+  describe("Markdown rendering for agent messages", () => {
+    it("renders bold text as a <strong> element", () => {
+      render(
+        <MessageBubble
+          message={buildMessage({ role: "agent", content: "Esto es **importante**" })}
+        />
+      );
+
+      const strong = screen.getByText("importante");
+      expect(strong.tagName).toBe("STRONG");
+    });
+
+    it("renders a markdown list as <ul>/<li> elements", () => {
+      render(
+        <MessageBubble
+          message={buildMessage({
+            role: "agent",
+            content: "Opciones:\n\n- Primera opción\n- Segunda opción"
+          })}
+        />
+      );
+
+      const list = screen.getByRole("list");
+      const items = screen.getAllByRole("listitem");
+      expect(list.tagName).toBe("UL");
+      expect(items).toHaveLength(2);
+      expect(items[0]).toHaveTextContent("Primera opción");
+      expect(items[1]).toHaveTextContent("Segunda opción");
+    });
+
+    it("renders a markdown ordered list as an <ol> element", () => {
+      render(
+        <MessageBubble
+          message={buildMessage({
+            role: "agent",
+            content: "Pasos:\n\n1. Primero\n2. Segundo"
+          })}
+        />
+      );
+
+      const list = screen.getByRole("list");
+      expect(list.tagName).toBe("OL");
+      expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    });
+
+    it("renders a markdown link as a safe, blank-target <a> element", () => {
+      render(
+        <MessageBubble
+          message={buildMessage({
+            role: "agent",
+            content: "Visita [AGIChat](https://agichat.example.com)"
+          })}
+        />
+      );
+
+      const link = screen.getByRole("link", { name: "AGIChat" });
+      expect(link).toHaveAttribute("href", "https://agichat.example.com");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
+
+    it("renders a heading as an <h2> element", () => {
+      render(
+        <MessageBubble message={buildMessage({ role: "agent", content: "## Hola" })} />
+      );
+
+      expect(screen.getByRole("heading", { level: 2, name: "Hola" })).toBeInTheDocument();
+    });
+  });
+
+  it("renders user message content as plain text without interpreting markdown syntax", () => {
+    render(
+      <MessageBubble
+        message={buildMessage({ role: "user", content: "Esto **no** debería ser negrita" })}
+      />
+    );
+
+    expect(
+      screen.getByText("Esto **no** debería ser negrita")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("no")).not.toBeInTheDocument();
+    expect(document.querySelector("strong")).not.toBeInTheDocument();
+  });
 });
