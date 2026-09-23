@@ -35,6 +35,7 @@ export interface AGIChatTheme {
 
 export type AGIChatThemeOverride = Partial<AGIChatTheme>;
 
+// Paleta y medidas que se aplican cuando el integrador no proporciona un tema.
 export const defaultTheme: AGIChatTheme = {
   fontFamily:
     "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
@@ -71,6 +72,8 @@ export const defaultTheme: AGIChatTheme = {
   focusRing: "rgba(79, 70, 229, 0.22)"
 };
 
+// Completar sobre los valores predeterminados permite personalizaciones
+// parciales sin propagar propiedades indefinidas a los componentes.
 export const resolveTheme = (
   override: AGIChatThemeOverride = {}
 ): AGIChatTheme => Object.freeze({ ...defaultTheme, ...override });

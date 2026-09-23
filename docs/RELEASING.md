@@ -25,7 +25,9 @@ el Release PR.
 3. Revisa el Release PR y confirma que el Quality gate esté en verde.
 4. Fusiona el Release PR después de recibir al menos una aprobación.
 5. El workflow crea el tag y el GitHub Release, construye el SDK y adjunta los
-   bundles ESM e IIFE, las declaraciones TypeScript y `SHA256SUMS.txt`.
+   bundles ESM e IIFE, un paquete `.tgz` instalable por cada módulo y
+   `SHA256SUMS.txt`. Las declaraciones TypeScript se incluyen completas dentro
+   de los paquetes para conservar sus imports internos.
 
 Los prefijos `fix:` y `feat:` producen incrementos patch y minor,
 respectivamente. Un `!` después del tipo o un pie `BREAKING CHANGE:` indica un

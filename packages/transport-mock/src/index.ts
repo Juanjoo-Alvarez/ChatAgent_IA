@@ -1,3 +1,4 @@
+// API pública del transporte simulado.
 export {
   MockTransportAdapter,
   MockTransportDisposedError,

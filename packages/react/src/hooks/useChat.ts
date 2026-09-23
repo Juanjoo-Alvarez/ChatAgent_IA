@@ -50,6 +50,7 @@ export const useChat = (options: UseChatOptions): UseChatResult => {
   const { transport, session, sessionId, now, createId } = options;
 
   const resolvedSession = useMemo(
+    // La sesión solo cambia si cambia el objeto recibido o su identificador.
     () => session ?? new Session({ id: sessionId ?? "default-session" }),
     [session, sessionId]
   );
@@ -68,6 +69,7 @@ export const useChat = (options: UseChatOptions): UseChatResult => {
   createIdRef.current = createId;
 
   useEffect(() => {
+    // Cada combinación sesión/transporte posee exactamente un motor.
     const engine = new ChatEngine(resolvedSession, transport, {
       now: () => nowRef.current?.() ?? new Date(),
       createId: () => createIdRef.current?.() ?? defaultCreateId()
@@ -82,6 +84,7 @@ export const useChat = (options: UseChatOptions): UseChatResult => {
     });
 
     return () => {
+      // React ejecuta esta limpieza al desmontar o reemplazar dependencias.
       unsubscribe();
       engine.dispose();
       engineRef.current = null;

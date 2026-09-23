@@ -76,6 +76,7 @@ export const InputBar = ({
   const [isFocused, setIsFocused] = useState(false);
 
   const trySend = (): void => {
+    // Se eliminan espacios exteriores antes de validar y enviar el contenido.
     const trimmed = value.trim();
 
     if (trimmed.length === 0 || disabled) {
@@ -83,10 +84,13 @@ export const InputBar = ({
     }
 
     onSend(trimmed);
+    // El campo se limpia únicamente después de aceptar el envío.
     setValue("");
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    // Enter envía; Shift+Enter conserva el comportamiento esperado de una
+    // caja multilínea y agrega un salto de línea.
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       trySend();

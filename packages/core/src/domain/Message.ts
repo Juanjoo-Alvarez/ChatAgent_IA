@@ -1,5 +1,7 @@
+// Roles admitidos por la conversación.
 export type MessageRole = "user" | "agent";
 
+// Estados posibles durante el envío de un mensaje.
 export type MessageStatus = "sending" | "sent" | "error";
 
 export interface MessageProps {
@@ -13,11 +15,14 @@ export interface MessageProps {
 const ALLOWED_TRANSITIONS: Readonly<
   Record<MessageStatus, readonly MessageStatus[]>
 > = {
+  // Un envío pendiente solo puede confirmarse o terminar con error.
   sending: ["sent", "error"],
+  // Los estados finales no admiten nuevas transiciones.
   sent: [],
   error: []
 };
 
+/** Mensaje inmutable con transiciones de estado controladas por el dominio. */
 export class Message {
   public readonly id: string;
   public readonly role: MessageRole;
@@ -27,6 +32,7 @@ export class Message {
   private readonly timestampValue: Date;
 
   public constructor(props: MessageProps) {
+    // Los identificadores y contenidos vacíos no forman mensajes válidos.
     if (props.id.trim().length === 0) {
       throw new Error("Message id cannot be empty");
     }
@@ -47,10 +53,12 @@ export class Message {
   }
 
   public get timestamp(): Date {
+    // Se devuelve una copia para que Date no rompa la inmutabilidad del mensaje.
     return new Date(this.timestampValue.getTime());
   }
 
   public withStatus(status: MessageStatus): Message {
+    // Reutilizar la instancia evita notificaciones innecesarias si nada cambió.
     if (status === this.status) {
       return this;
     }

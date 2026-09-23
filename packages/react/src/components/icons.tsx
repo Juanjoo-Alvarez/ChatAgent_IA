@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+// Ícono decorativo que identifica visualmente al agente.
 export const AgentIcon = (): ReactElement => (
   <svg
     aria-hidden="true"
@@ -23,6 +24,7 @@ export const AgentIcon = (): ReactElement => (
   </svg>
 );
 
+// Ícono decorativo del botón que envía el mensaje.
 export const SendIcon = (): ReactElement => (
   <svg
     aria-hidden="true"

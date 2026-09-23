@@ -21,6 +21,8 @@ const assertNonEmptyFile = async (file, label) => {
 const esmSize = await assertNonEmptyFile(ESM_BUNDLE, "ESM");
 const iifeSize = await assertNonEmptyFile(IIFE_BUNDLE, "IIFE");
 const iifeSource = await readFile(IIFE_BUNDLE, "utf8");
+// JSDOM ejecuta el IIFE como lo haría un navegador y comprueba que el bundle
+// distribuible registra un Web Component funcional, no solo un archivo válido.
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   runScripts: "outside-only",
   url: "https://agichat.test"

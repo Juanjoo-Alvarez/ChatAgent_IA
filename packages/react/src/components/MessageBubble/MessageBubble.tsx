@@ -103,6 +103,7 @@ export const MessageBubble = ({
   theme: themeOverride
 }: MessageBubbleProps): ReactElement => {
   const theme = resolveTheme(themeOverride);
+  // El rol controla alineación, colores, avatar y forma de renderizar contenido.
   const isUser = message.role === "user";
 
   return (
@@ -130,6 +131,8 @@ export const MessageBubble = ({
       >
         <div className="agichat-message__content">
           {isUser ? (
+            // El texto del usuario se muestra literalmente para no interpretar
+            // Markdown que el usuario no esperaba renderizar.
             message.content
           ) : (
             <Markdown components={markdownComponents(theme)}>

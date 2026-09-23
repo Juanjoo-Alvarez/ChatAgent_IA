@@ -27,6 +27,7 @@ const ULTIMATE_QUESTION_PATTERN =
   /(?:life.*universe.*everything|vida.*universo.*todo)/i;
 
 const defaultCreateReply = (userContent: string): string => {
+  // La respuesta especial reproduce el caso mostrado en el wireframe.
   if (ULTIMATE_QUESTION_PATTERN.test(userContent)) {
     return "42";
   }
@@ -105,6 +106,7 @@ export class MockTransportAdapter implements ITransportAdapter {
   }
 
   public sendMessage(content: string): Promise<void> {
+    // Cada modo permite probar la UI sin depender de servicios externos.
     if (this.disposed) {
       return Promise.reject(new MockTransportDisposedError());
     }
@@ -152,6 +154,8 @@ export class MockTransportAdapter implements ITransportAdapter {
 
     this.handlers.add(handler);
 
+    // Eliminar un handler inexistente es seguro, por lo que unsubscribe puede
+    // ejecutarse más de una vez.
     return () => {
       this.handlers.delete(handler);
     };
@@ -164,6 +168,8 @@ export class MockTransportAdapter implements ITransportAdapter {
 
     this.disposed = true;
 
+    // Además de limpiar timers, se rechazan las promesas pendientes para que
+    // ningún envío quede esperando indefinidamente al desmontar el widget.
     for (const timer of this.pendingTimers) {
       clearTimeout(timer.handle);
       timer.cancel?.();
@@ -184,6 +190,8 @@ export class MockTransportAdapter implements ITransportAdapter {
   }
 
   private scheduleTypingAndReply(userContent: string): void {
+    // Los dos temporizadores reproducen la secuencia que entregará un backend:
+    // empieza a escribir, deja de escribir y finalmente envía el mensaje.
     this.runAfter(this.typingDelayMs, () => {
       this.emit({ type: "agent-typing", isTyping: true });
 

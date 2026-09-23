@@ -22,6 +22,16 @@
           "type": "json",
           "path": "packages/embed/package.json",
           "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "packages/transport-mock/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "packages/transport-websocket/package.json",
+          "jsonpath": "$.version"
         }
       ]
     }
