@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Juanjoo-Alvarez/ChatAgent_IA/compare/v0.2.0...v0.2.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **release:** package distributable sdk artifacts ([30ed067](https://github.com/Juanjoo-Alvarez/ChatAgent_IA/commit/30ed0678f24f0fab575635bcf3bfa8dc4045b457))
+
 ## [0.2.0](https://github.com/Juanjoo-Alvarez/ChatAgent_IA/compare/v0.1.0...v0.2.0) (2026-09-23)
 
 
