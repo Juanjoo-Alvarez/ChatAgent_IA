@@ -1,8 +1,24 @@
 import type { CSSProperties, ReactElement } from "react";
+import Markdown from "react-markdown";
+import type { Components } from "react-markdown";
 
 import type { Message } from "@agichat/core";
 
 import { defaultTheme } from "../../theme";
+
+// react-markdown no interpreta HTML crudo por defecto (no se usa rehype-raw),
+// por lo que el contenido del agente se renderiza de forma segura sin abrir
+// una vía de inyección de HTML/XSS.
+const markdownComponents: Components = {
+  p: ({ children }) => <p style={{ margin: 0 }}>{children}</p>,
+  ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 20 }}>{children}</ul>,
+  ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 20 }}>{children}</ol>,
+  a: ({ children, href }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "inherit" }}>
+      {children}
+    </a>
+  )
+};
 
 export interface MessageBubbleProps {
   readonly message: Message;
@@ -51,7 +67,13 @@ export const MessageBubble = ({ message }: MessageBubbleProps): ReactElement => 
         role="article"
         aria-label={isUser ? "Mensaje enviado" : "Mensaje del agente"}
       >
-        <span className="agichat-message__content">{message.content}</span>
+        <div className="agichat-message__content">
+          {isUser ? (
+            message.content
+          ) : (
+            <Markdown components={markdownComponents}>{message.content}</Markdown>
+          )}
+        </div>
         {message.status === "sending" && (
           <span
             className="agichat-message__status"
