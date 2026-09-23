@@ -18,6 +18,19 @@ importers:
         specifier: ^8.69.0
         version: 8.69.0(eslint@10.9.1(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
 
+  apps/demo:
+    dependencies:
+      '@agichat/embed':
+        specifier: workspace:*
+        version: link:../../packages/embed
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^8.3.0
+        version: 8.3.0(esbuild@0.28.2)
+
   packages/core:
     devDependencies:
       '@vitest/coverage-v8':
