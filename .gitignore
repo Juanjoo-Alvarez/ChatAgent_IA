@@ -4,3 +4,4 @@ dist/
 coverage/
 release-artifacts/
 *.tsbuildinfo
+.vite/

@@ -40,6 +40,12 @@ pnpm --filter @agichat/embed test
 pnpm --filter @agichat/react typecheck
 ```
 
+Para comprobar cambios visibles en la integración, inicia la demo:
+
+```bash
+pnpm dev:demo
+```
+
 ## Convenciones de código
 
 - Escribe TypeScript estricto y conserva las opciones estrictas existentes.
@@ -66,6 +72,14 @@ pnpm --filter @agichat/react typecheck
 - Modifica dependencias mediante pnpm y confirma `pnpm-lock.yaml` cuando corresponda.
 - No agregues dependencias si una utilidad existente resuelve el problema claramente.
 - Nunca incluyas tokens, secretos, credenciales o endpoints privados.
+
+## Aplicaciones de ejemplo
+
+- Las aplicaciones ejecutables pertenecen a `apps/<nombre>` y deben declararse en `pnpm-workspace.yaml`.
+- Una demo debe consumir únicamente APIs públicas de los paquetes; no importes rutas internas bajo `src/`.
+- Mantén los escenarios y textos de muestra separados de la lógica reutilizable del SDK.
+- La demo puede omitir pruebas unitarias cuando sólo compone APIs ya probadas, pero debe pasar lint, typecheck y build.
+- No confirmes el directorio `dist` generado por Vite.
 
 ## GitHub Flow
 
