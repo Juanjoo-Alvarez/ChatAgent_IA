@@ -98,4 +98,16 @@ describe("useChat", () => {
     unmount();
     expect(transport.subscriberCount).toBe(0);
   });
+
+  it("ignores a sendMessage call made after the hook has unmounted", async () => {
+    const transport = new FakeTransportAdapter();
+    const { result, unmount } = renderHook(() =>
+      useChat({ transport, sessionId: "session-1" })
+    );
+
+    unmount();
+
+    await expect(result.current.sendMessage("Hola")).resolves.toBeUndefined();
+    expect(transport.sentContents).toEqual([]);
+  });
 });

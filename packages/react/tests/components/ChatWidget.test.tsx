@@ -14,6 +14,18 @@ describe("ChatWidget", () => {
     ).toBeInTheDocument();
   });
 
+  it("accepts a custom sessionId and placeholder", () => {
+    render(
+      <ChatWidget
+        transport={new FakeTransportAdapter()}
+        sessionId="custom-session"
+        placeholder="Pregúntame algo…"
+      />
+    );
+
+    expect(screen.getByPlaceholderText("Pregúntame algo…")).toBeInTheDocument();
+  });
+
   it("renders the widget title", () => {
     render(<ChatWidget transport={new FakeTransportAdapter()} title="Soporte AGIChat" />);
 
