@@ -1,3 +1,5 @@
+// Punto de entrada público de Core. Centralizar los exports evita que los
+// consumidores dependan de la estructura interna de carpetas.
 export {
   ChatEngine,
   type ChatEngineOptions,

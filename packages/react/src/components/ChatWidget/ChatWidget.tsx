@@ -13,6 +13,7 @@ import { InputBar } from "../InputBar/InputBar";
 import { MessageBubble } from "../MessageBubble/MessageBubble";
 
 export interface ChatWidgetProps {
+  // El transporte es obligatorio y mantiene la UI independiente del backend.
   readonly transport: ITransportAdapter;
   readonly session?: Session;
   readonly sessionId?: string;
@@ -149,6 +150,10 @@ const emptyStateStyle = (theme: AGIChatTheme): CSSProperties => ({
   padding: "24px"
 });
 
+/**
+ * Vista principal del SDK. Recibe el transporte por inyección y delega todo el
+ * estado conversacional al hook para mantener el componente presentacional.
+ */
 export const ChatWidget = ({
   transport,
   session,
@@ -159,6 +164,7 @@ export const ChatWidget = ({
   emptyStateMessage = "Escribe un mensaje para comenzar la conversación.",
   theme: themeOverride
 }: ChatWidgetProps): ReactElement => {
+  // Cada override se combina con el tema base antes de calcular estilos.
   const theme = resolveTheme(themeOverride);
   const { messages, isAgentTyping, isSending, error, sendMessage } = useChat({
     transport,
@@ -198,6 +204,7 @@ export const ChatWidget = ({
         role="log"
         aria-live="polite"
       >
+        {/* La región live anuncia mensajes nuevos a tecnologías de asistencia. */}
         {messages.length === 0 ? (
           <p
             className="agichat-widget__empty-state"
@@ -213,6 +220,7 @@ export const ChatWidget = ({
       </div>
 
       {isAgentTyping && (
+        // El indicador se renderiza solo mientras Core reporta escritura.
         <div
           className="agichat-widget__typing"
           style={typingIndicatorStyle(theme)}

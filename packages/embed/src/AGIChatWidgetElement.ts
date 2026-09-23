@@ -21,8 +21,10 @@ const hostStyles = `
   }
 `;
 
+/** Web Component que encapsula el widget y lo expone a sitios sin React. */
 export class AGIChatWidgetElement extends HTMLElement {
   public static get observedAttributes(): string[] {
+    // El navegador invoca attributeChangedCallback solo para esta lista.
     return ["title", "session-id", "placeholder", "empty-state-message"];
   }
 
@@ -35,6 +37,7 @@ export class AGIChatWidgetElement extends HTMLElement {
   public constructor() {
     super();
 
+    // Shadow DOM aísla los estilos del SDK de los estilos de la página host.
     const shadowRoot = this.attachShadow({ mode: "open" });
     const style = document.createElement("style");
     this.mountTarget = document.createElement("div");
@@ -46,6 +49,7 @@ export class AGIChatWidgetElement extends HTMLElement {
   }
 
   public get transport(): AGIChatTransport {
+    // Sin transporte inyectado, el componente crea un mock listo para la demo.
     return this.injectedTransport ?? this.getOwnedTransport();
   }
 
@@ -79,10 +83,13 @@ export class AGIChatWidgetElement extends HTMLElement {
   }
 
   public connectedCallback(): void {
+    // connectedCallback es el punto de montaje estándar de Web Components.
     this.renderWidget();
   }
 
   public disconnectedCallback(): void {
+    // Solo se elimina el transporte creado por el componente; uno inyectado
+    // sigue perteneciendo al consumidor y puede reutilizarse en otro widget.
     this.teardownWidget();
     this.disposeOwnedTransport();
   }
@@ -105,6 +112,8 @@ export class AGIChatWidgetElement extends HTMLElement {
   }
 
   private renderWidget(): void {
+    // React no admite crear otra raíz sobre el mismo nodo; primero se desmonta
+    // la instancia anterior y luego se aplican atributos y propiedades nuevas.
     this.teardownWidget();
 
     const title = this.getAttribute("title");
@@ -141,6 +150,8 @@ export const registerAGIChatWidget = (
   const registeredElement = registry.get(AGICHAT_WIDGET_TAG);
 
   if (registeredElement !== undefined) {
+    // Registrar dos veces el mismo tag lanza en el navegador. Devolver la
+    // definición existente hace segura la carga repetida del bundle.
     return registeredElement;
   }
 

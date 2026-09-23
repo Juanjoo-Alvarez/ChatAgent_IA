@@ -24,6 +24,7 @@ export type MessagesChangeHandler = (
 export type StateChangeHandler = (state: ChatEngineState) => void;
 
 const defaultCreateId = (): string => {
+  // randomUUID es la opción preferida cuando el entorno la ofrece.
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
   }
@@ -31,6 +32,10 @@ const defaultCreateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
+/**
+ * Orquesta el estado del chat sin depender de React ni de un transporte
+ * concreto. La UI solo observa snapshots y envía comandos a este motor.
+ */
 export class ChatEngine {
   private readonly conversation: Conversation;
   private readonly messagesChangeHandlers = new Set<MessagesChangeHandler>();
@@ -58,6 +63,8 @@ export class ChatEngine {
   public async sendUserMessage(text: string): Promise<Message> {
     this.ensureActive();
 
+    // El mensaje aparece de inmediato como "sending"; la confirmación del
+    // transporte decide después si termina en "sent" o "error".
     const message = new Message({
       id: this.createId(),
       role: "user",
@@ -89,6 +96,7 @@ export class ChatEngine {
   }
 
   public getState(): ChatEngineState {
+    // Se entrega un snapshot completo para simplificar la sincronización de UI.
     return {
       session: this.session,
       messages: this.getMessages(),
@@ -109,6 +117,7 @@ export class ChatEngine {
   public onStateChange(handler: StateChangeHandler): () => void {
     this.ensureActive();
     this.stateChangeHandlers.add(handler);
+    // El suscriptor recibe el estado actual sin esperar al próximo evento.
     handler(this.getState());
 
     return () => {
@@ -117,6 +126,7 @@ export class ChatEngine {
   }
 
   public dispose(): void {
+    // dispose es idempotente para permitir limpiezas repetidas con seguridad.
     if (this.disposed) {
       return;
     }
@@ -142,6 +152,8 @@ export class ChatEngine {
       return;
     }
 
+    // Un mensaje entrante también finaliza el indicador de escritura para
+    // mantener consistente el estado aunque el adaptador no emita el cierre.
     this.agentTyping = false;
     this.conversation.addMessage(
       new Message({

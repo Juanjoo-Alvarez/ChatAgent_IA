@@ -8,9 +8,12 @@ export type UnmountChatWidget = () => boolean;
 
 type ResolvedTarget = Element | DocumentFragment;
 
+// WeakMap evita retener nodos desmontados y también impide montar dos raíces
+// de React sobre el mismo elemento.
 const mountedRoots = new WeakMap<ResolvedTarget, Root>();
 
 const resolveTarget = (target: ChatWidgetTarget): ResolvedTarget => {
+  // Elementos ya resueltos pueden usarse directamente.
   if (typeof target !== "string") {
     return target;
   }
@@ -21,6 +24,7 @@ const resolveTarget = (target: ChatWidgetTarget): ResolvedTarget => {
 
   const element = document.querySelector(target);
 
+  // Fallar temprano produce un error más claro que createRoot(null).
   if (element === null) {
     throw new Error(`AGIChat mount target was not found: ${target}`);
   }
@@ -54,6 +58,8 @@ export const mountChatWidget = (
   mountedRoots.set(resolvedTarget, root);
   root.render(createElement(ChatWidget, props));
 
+  // La misma función resuelve el ciclo de vida sin obligar al consumidor a
+  // conservar detalles internos de React.
   return () => unmountResolvedTarget(resolvedTarget);
 };
 

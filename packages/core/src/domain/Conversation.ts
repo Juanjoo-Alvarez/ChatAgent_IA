@@ -1,16 +1,23 @@
 import type { Message, MessageStatus } from "./Message";
 
+/**
+ * Conserva el orden de la conversación y permite buscar mensajes por id sin
+ * exponer las colecciones mutables que utiliza internamente.
+ */
 export class Conversation {
+  // El mapa ofrece búsquedas rápidas; el arreglo conserva el orden visual.
   private readonly messagesById = new Map<string, Message>();
   private orderedMessages: Message[] = [];
 
   public constructor(initialMessages: readonly Message[] = []) {
+    // Se usa addMessage para aplicar también la validación de ids duplicados.
     for (const message of initialMessages) {
       this.addMessage(message);
     }
   }
 
   public getMessages(): readonly Message[] {
+    // El snapshot evita que un consumidor pueda alterar el historial interno.
     return [...this.orderedMessages];
   }
 
@@ -40,6 +47,8 @@ export class Conversation {
     }
 
     this.messagesById.set(messageId, updatedMessage);
+    // Se reemplaza el arreglo para que los observadores reciban una referencia
+    // nueva y React pueda reconocer el cambio de estado.
     this.orderedMessages = this.orderedMessages.map((message) =>
       message.id === messageId ? updatedMessage : message
     );

@@ -1,3 +1,5 @@
+// El metadata permite transportar contexto del cliente sin acoplar el dominio
+// a una forma específica de datos.
 export type SessionMetadata = Readonly<Record<string, unknown>>;
 
 export interface SessionProps {
@@ -5,6 +7,7 @@ export interface SessionProps {
   readonly metadata?: SessionMetadata;
 }
 
+/** Identifica una conversación y transporta contexto opcional del cliente. */
 export class Session {
   public readonly id: string;
   public readonly metadata: SessionMetadata | undefined;
@@ -15,6 +18,7 @@ export class Session {
     }
 
     this.id = props.id;
+    // La copia congelada impide que cambios externos modifiquen la sesión.
     this.metadata =
       props.metadata === undefined
         ? undefined
