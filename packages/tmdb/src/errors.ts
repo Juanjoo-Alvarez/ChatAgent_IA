@@ -7,7 +7,10 @@ export type TmdbErrorCode =
   | "timeout"
   | "network"
   | "unexpected_status"
-  | "bad_response";
+  | "bad_response"
+  // Errores locales de la política de cuotas: la solicitud no llegó a TMDB.
+  | "quota_exhausted"
+  | "quota_unavailable";
 
 const RETRYABLE_CODES: ReadonlySet<TmdbErrorCode> = new Set([
   "rate_limited",

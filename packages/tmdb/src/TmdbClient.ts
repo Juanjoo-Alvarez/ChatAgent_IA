@@ -1,3 +1,11 @@
+import {
+  QuotaExceededError,
+  QuotaUnavailableError,
+  ReadThroughCache,
+  buildCacheKey
+} from "@agichat/external-api";
+import type { CacheStore, FetchLike } from "@agichat/external-api";
+
 import { TmdbError, errorFromResponse } from "./errors";
 import {
   comparisonKey,
@@ -49,13 +57,46 @@ export const DEFAULT_MIN_VOTES_WITH_RATING = 50;
 export const CANDIDATES_DISCLAIMER =
   "Candidatos obtenidos con filtros de TMDB. No constituyen recomendaciones personalizadas definitivas.";
 
-/** Subconjunto de `fetch` que necesita el cliente; permite inyectar cuotas o mocks. */
-export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
+/** Proveedor con el que se registran las solicitudes en la política de cuotas. */
+export const TMDB_QUOTA_PROVIDER = "tmdb";
+
+/** Versión del contrato en las claves: cambiarla invalida la caché anterior. */
+export const TMDB_CACHE_NAMESPACE = "tmdb:v1";
+
+export interface TmdbCacheTtl {
+  readonly genres: number;
+  readonly details: number;
+  readonly externalIds: number;
+  readonly search: number;
+  readonly discover: number;
+}
+
+// Géneros, detalles e identificadores cambian poco; los listados dependen de
+// popularidad y votos, que TMDB actualiza con frecuencia.
+export const DEFAULT_TMDB_CACHE_TTL_MS: TmdbCacheTtl = {
+  genres: 24 * 60 * 60 * 1000,
+  details: 24 * 60 * 60 * 1000,
+  externalIds: 24 * 60 * 60 * 1000,
+  search: 15 * 60 * 1000,
+  discover: 15 * 60 * 1000
+};
+
+export interface TmdbCacheOptions {
+  readonly store: CacheStore;
+  readonly ttlMs?: Partial<TmdbCacheTtl> | undefined;
+  readonly onStoreError?: ((error: unknown, operation: "get" | "set" | "delete") => void) | undefined;
+}
 
 export interface TmdbClientOptions {
   /** Token de lectura de la API (v4). Debe provenir de variables de entorno. */
   readonly accessToken: string;
+  /**
+   * Transporte HTTP. Para aplicar cuotas y reintentos, pasar
+   * `createResilientFetch({ provider: TMDB_QUOTA_PROVIDER, quota })`.
+   */
   readonly fetch?: FetchLike | undefined;
+  /** Sin esta opción el cliente no guarda resultados. */
+  readonly cache?: TmdbCacheOptions | undefined;
   readonly baseUrl?: string | undefined;
   readonly imageBaseUrl?: string | undefined;
   readonly posterSize?: string | undefined;
@@ -111,6 +152,11 @@ function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
+/** Un listado con géneros no disponibles es un resultado degradado: no se guarda. */
+function isCompletePage(page: MoviePage): boolean {
+  return page.results.every((movie) => movie.field_status.genres !== "unavailable");
+}
+
 export class TmdbClient {
   private readonly accessToken: string;
   private readonly fetchImpl: FetchLike;
@@ -119,6 +165,8 @@ export class TmdbClient {
   private readonly posterSize: string;
   private readonly language: string;
   private readonly timeoutMs: number;
+  private readonly cache: ReadThroughCache | null;
+  private readonly cacheTtl: TmdbCacheTtl;
   private genresPromise: Promise<readonly Genre[]> | null = null;
 
   public constructor(options: TmdbClientOptions) {
@@ -141,6 +189,14 @@ export class TmdbClient {
     this.posterSize = options.posterSize ?? DEFAULT_POSTER_SIZE;
     this.language = options.language ?? DEFAULT_LANGUAGE;
     this.timeoutMs = timeoutMs;
+    this.cacheTtl = { ...DEFAULT_TMDB_CACHE_TTL_MS, ...options.cache?.ttlMs };
+    this.cache =
+      options.cache === undefined
+        ? null
+        : new ReadThroughCache(
+            options.cache.store,
+            options.cache.onStoreError === undefined ? {} : { onStoreError: options.cache.onStoreError }
+          );
   }
 
   /** Busca por título. TMDB no filtra por género aquí, así que se filtra la página. */
@@ -151,6 +207,68 @@ export class TmdbClient {
   /** Detalles de una película, con el identificador IMDb cuando TMDB lo conoce. */
   public async getMovieDetails(movieId: number): Promise<Movie> {
     const id = assertMovieId(movieId);
+    return this.cached("details", { id }, "details", () => this.loadDetails(id), (movie) =>
+      movie.field_status.imdb_id !== "unavailable"
+    );
+  }
+
+  public async getExternalIds(movieId: number): Promise<ExternalIdsResult> {
+    const id = assertMovieId(movieId);
+    return this.cached("external_ids", { id }, "externalIds", async () => {
+      const body = await this.request(`/movie/${id}/external_ids`, {});
+      if (!isRecord(body)) {
+        throw badResponse("TMDB returned external ids in an unexpected format");
+      }
+      const imdb = readImdbId(body.imdb_id);
+      return { id, imdb_id: imdb.value, imdb_status: imdb.status };
+    });
+  }
+
+  public async discoverMovies(params: DiscoverMoviesParams): Promise<MoviePage> {
+    const { query, page } = await this.buildDiscoverQuery(params);
+    return this.fetchDiscoverPage(query, page);
+  }
+
+  /**
+   * Obtiene candidatos a partir de preferencias. Con término de búsqueda usa
+   * `/search/movie` y aplica los filtros restantes sobre la página; sin él,
+   * delega todos los filtros en `/discover/movie`.
+   */
+  public async getMovieCandidates(criteria: CandidateCriteria): Promise<CandidateResult> {
+    if (criteria.query !== undefined) {
+      return this.candidatesFromSearch(criteria);
+    }
+
+    const { query, page, filters } = await this.buildDiscoverQuery(criteria);
+    const moviePage = await this.fetchDiscoverPage(query, page);
+
+    return {
+      kind: "candidates",
+      strategy: "discover",
+      candidates: moviePage.results,
+      page: moviePage.page,
+      total_pages: moviePage.total_pages,
+      total_results: moviePage.total_results,
+      skipped: moviePage.skipped,
+      applied_filters: filters,
+      filters_applied_locally: [],
+      ignored_filters: [],
+      disclaimer: CANDIDATES_DISCLAIMER
+    };
+  }
+
+  /** Catálogo de géneros en el idioma configurado; se reintenta si falla. */
+  public getGenres(): Promise<readonly Genre[]> {
+    this.genresPromise ??= this.cached("genres", {}, "genres", () => this.fetchGenres(), (genres) =>
+      genres.length > 0
+    ).catch((error: unknown) => {
+      this.genresPromise = null;
+      throw error;
+    });
+    return this.genresPromise;
+  }
+
+  private async loadDetails(id: number): Promise<Movie> {
     const body = await this.request(`/movie/${id}`, {
       language: this.language,
       append_to_response: "external_ids"
@@ -171,60 +289,6 @@ export class TmdbClient {
     return movie;
   }
 
-  public async getExternalIds(movieId: number): Promise<ExternalIdsResult> {
-    const id = assertMovieId(movieId);
-    const body = await this.request(`/movie/${id}/external_ids`, {});
-    if (!isRecord(body)) {
-      throw badResponse("TMDB returned external ids in an unexpected format");
-    }
-    const imdb = readImdbId(body.imdb_id);
-    return { id, imdb_id: imdb.value, imdb_status: imdb.status };
-  }
-
-  public async discoverMovies(params: DiscoverMoviesParams): Promise<MoviePage> {
-    const { query, page } = await this.buildDiscoverQuery(params);
-    const raw = readPage(await this.request("/discover/movie", query), page);
-    return this.toMoviePage(raw, raw.items);
-  }
-
-  /**
-   * Obtiene candidatos a partir de preferencias. Con término de búsqueda usa
-   * `/search/movie` y aplica los filtros restantes sobre la página; sin él,
-   * delega todos los filtros en `/discover/movie`.
-   */
-  public async getMovieCandidates(criteria: CandidateCriteria): Promise<CandidateResult> {
-    if (criteria.query !== undefined) {
-      return this.candidatesFromSearch(criteria);
-    }
-
-    const { query, page, filters } = await this.buildDiscoverQuery(criteria);
-    const raw = readPage(await this.request("/discover/movie", query), page);
-    const moviePage = await this.toMoviePage(raw, raw.items);
-
-    return {
-      kind: "candidates",
-      strategy: "discover",
-      candidates: moviePage.results,
-      page: moviePage.page,
-      total_pages: moviePage.total_pages,
-      total_results: moviePage.total_results,
-      skipped: moviePage.skipped,
-      applied_filters: filters,
-      filters_applied_locally: [],
-      ignored_filters: [],
-      disclaimer: CANDIDATES_DISCLAIMER
-    };
-  }
-
-  /** Catálogo de géneros en el idioma configurado; se reintenta si falla. */
-  public getGenres(): Promise<readonly Genre[]> {
-    this.genresPromise ??= this.fetchGenres().catch((error: unknown) => {
-      this.genresPromise = null;
-      throw error;
-    });
-    return this.genresPromise;
-  }
-
   private async search(
     params: SearchMoviesParams,
     genreMatch: GenreMatch
@@ -233,7 +297,24 @@ export class TmdbClient {
     const { year } = assertYearCriteria(params.year, undefined, undefined);
     const page = assertPage(params.page);
     const genreFilter = await this.resolveGenreFilter(params.genres);
+    const genreIds = genreFilter === null ? [] : [...genreFilter.ids].sort((a, b) => a - b);
 
+    return this.cached(
+      "search",
+      { query, year, page, genre_ids: genreIds, genre_match: genreFilter === null ? null : genreMatch },
+      "search",
+      () => this.loadSearch(query, year, page, genreFilter, genreMatch),
+      isCompletePage
+    );
+  }
+
+  private async loadSearch(
+    query: string,
+    year: number | undefined,
+    page: number,
+    genreFilter: GenreFilter | null,
+    genreMatch: GenreMatch
+  ): Promise<MovieSearchResult> {
     const raw = readPage(
       await this.request("/search/movie", {
         query,
@@ -474,6 +555,45 @@ export class TmdbClient {
     }
   }
 
+  private fetchDiscoverPage(query: Record<string, QueryValue>, page: number): Promise<MoviePage> {
+    // La consulta ya validada y con géneros resueltos es la clave más precisa.
+    return this.cached(
+      "discover",
+      query,
+      "discover",
+      async () => {
+        const raw = readPage(await this.request("/discover/movie", query), page);
+        return this.toMoviePage(raw, raw.items);
+      },
+      isCompletePage
+    );
+  }
+
+  /**
+   * Las claves incluyen idioma y configuración de imágenes, porque ambos
+   * cambian el resultado normalizado. Sin caché configurada, carga directo.
+   */
+  private cached<T>(
+    operation: string,
+    params: Readonly<Record<string, unknown>>,
+    ttl: keyof TmdbCacheTtl,
+    load: () => Promise<T>,
+    shouldCache?: (value: T) => boolean
+  ): Promise<T> {
+    if (this.cache === null) {
+      return load();
+    }
+    const key = buildCacheKey(TMDB_CACHE_NAMESPACE, operation, {
+      ...params,
+      _language: this.language,
+      _images: `${this.imageBaseUrl}/${this.posterSize}`
+    });
+    return this.cache.getOrLoad(key, load, {
+      ttlMs: this.cacheTtl[ttl],
+      ...(shouldCache === undefined ? {} : { shouldCache })
+    });
+  }
+
   private async toMoviePage(raw: RawPage, items: readonly unknown[]): Promise<MoviePage> {
     const context = {
       ...this.imageContext(),
@@ -544,6 +664,21 @@ export class TmdbClient {
         }
         if (error instanceof TmdbError) {
           throw error;
+        }
+        if (error instanceof QuotaExceededError) {
+          throw new TmdbError({
+            code: "quota_exhausted",
+            message: "The configured TMDB quota is exhausted; the request was not sent",
+            retryAfterMs: error.retryAfterMs,
+            cause: error
+          });
+        }
+        if (error instanceof QuotaUnavailableError) {
+          throw new TmdbError({
+            code: "quota_unavailable",
+            message: "The quota store is unavailable; the request was not sent",
+            cause: error
+          });
         }
         throw new TmdbError({
           code: "network",

@@ -1,14 +1,19 @@
 // API pública de la integración con TMDB.
+export type { FetchLike } from "@agichat/external-api";
 export {
   CANDIDATES_DISCLAIMER,
   DEFAULT_LANGUAGE,
+  DEFAULT_TMDB_CACHE_TTL_MS,
   DEFAULT_MIN_VOTES_WITH_RATING,
   DEFAULT_POSTER_SIZE,
   DEFAULT_TIMEOUT_MS,
   TMDB_API_BASE_URL,
+  TMDB_CACHE_NAMESPACE,
   TMDB_IMAGE_BASE_URL,
+  TMDB_QUOTA_PROVIDER,
   TmdbClient,
-  type FetchLike,
+  type TmdbCacheOptions,
+  type TmdbCacheTtl,
   type TmdbClientOptions
 } from "./TmdbClient";
 export {
