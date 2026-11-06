@@ -15,13 +15,13 @@ export {
   type TmdbCacheOptions,
   type TmdbCacheTtl,
   type TmdbClientOptions
-} from "./TmdbClient";
+} from "./TmdbClient.js";
 export {
   TmdbError,
   parseRetryAfter,
   type TmdbErrorCode,
   type TmdbErrorOptions
-} from "./errors";
+} from "./errors.js";
 export {
   IMDB_WEB_BASE_URL,
   TMDB_WEB_BASE_URL,
@@ -31,7 +31,7 @@ export {
   tmdbMovieUrl,
   type ImdbLookup,
   type NormalizeContext
-} from "./normalize";
+} from "./normalize.js";
 export {
   SORT_OPTIONS,
   type AppliedFilters,
@@ -51,5 +51,5 @@ export {
   type MovieSearchResult,
   type SearchMoviesParams,
   type SortOption
-} from "./types";
-export { MAX_PAGE, MAX_QUERY_LENGTH, MAX_YEAR, MIN_YEAR } from "./validation";
+} from "./types.js";
+export { MAX_PAGE, MAX_QUERY_LENGTH, MAX_YEAR, MIN_YEAR } from "./validation.js";

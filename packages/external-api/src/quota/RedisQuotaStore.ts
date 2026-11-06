@@ -1,11 +1,11 @@
-import type { RedisLike } from "../redis";
+import type { RedisLike } from "../redis.js";
 import {
   toWindowUsage,
   type QuotaAcquireResult,
   type QuotaStore,
   type QuotaWindow,
   type QuotaWindowUsage
-} from "./types";
+} from "./types.js";
 
 // Cada ventana es un sorted set cuyos miembros son los IDs de cada solicitud y
 // cuyo score es el instante en que se registró. La hora se toma de Redis

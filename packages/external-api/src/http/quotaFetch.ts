@@ -1,5 +1,5 @@
-import type { QuotaManager } from "../quota/QuotaManager";
-import type { FetchLike } from "./types";
+import type { QuotaManager } from "../quota/QuotaManager.js";
+import type { FetchLike } from "./types.js";
 
 // Errores en los que la conexión nunca se estableció, así que la solicitud no
 // llegó al proveedor. Un ECONNRESET, en cambio, puede ocurrir después del

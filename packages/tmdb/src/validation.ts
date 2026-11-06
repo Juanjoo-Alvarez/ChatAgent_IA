@@ -1,5 +1,5 @@
-import { TmdbError } from "./errors";
-import { SORT_OPTIONS, type SortOption } from "./types";
+import { TmdbError } from "./errors.js";
+import { SORT_OPTIONS, type SortOption } from "./types.js";
 
 // TMDB no entrega páginas posteriores a la 500 en búsqueda ni descubrimiento.
 export const MAX_PAGE = 500;

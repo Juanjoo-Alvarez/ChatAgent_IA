@@ -5,3 +5,6 @@ coverage/
 release-artifacts/
 *.tsbuildinfo
 .vite/
+.env
+.env.*
+!.env.example

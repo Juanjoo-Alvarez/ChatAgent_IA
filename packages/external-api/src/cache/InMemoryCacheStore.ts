@@ -1,4 +1,4 @@
-import type { CacheStore } from "./types";
+import type { CacheStore } from "./types.js";
 
 interface Entry {
   readonly value: string;

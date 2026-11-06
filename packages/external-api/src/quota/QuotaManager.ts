@@ -1,11 +1,11 @@
-import { QuotaConfigurationError, QuotaExceededError, QuotaUnavailableError } from "./errors";
+import { QuotaConfigurationError, QuotaExceededError, QuotaUnavailableError } from "./errors.js";
 import type {
   ProviderQuotaPolicy,
   ProviderQuotaUsage,
   QuotaEvent,
   QuotaStore,
   QuotaWindow
-} from "./types";
+} from "./types.js";
 
 const PROVIDER_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 

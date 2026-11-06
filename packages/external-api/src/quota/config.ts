@@ -1,5 +1,5 @@
-import { QuotaConfigurationError } from "./errors";
-import type { ProviderQuotaPolicy, QuotaWindow } from "./types";
+import { QuotaConfigurationError } from "./errors.js";
+import type { ProviderQuotaPolicy, QuotaWindow } from "./types.js";
 
 const UNIT_MS = {
   ms: 1,

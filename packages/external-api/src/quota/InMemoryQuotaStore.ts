@@ -4,7 +4,7 @@ import {
   type QuotaStore,
   type QuotaWindow,
   type QuotaWindowUsage
-} from "./types";
+} from "./types.js";
 
 interface Entry {
   readonly leaseId: string;

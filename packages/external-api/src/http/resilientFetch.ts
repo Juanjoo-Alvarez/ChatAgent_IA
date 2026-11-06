@@ -1,7 +1,7 @@
-import type { QuotaManager } from "../quota/QuotaManager";
-import { createQuotaFetch } from "./quotaFetch";
-import { createRetryFetch, type RetryOptions } from "./retryFetch";
-import type { FetchLike } from "./types";
+import type { QuotaManager } from "../quota/QuotaManager.js";
+import { createQuotaFetch } from "./quotaFetch.js";
+import { createRetryFetch, type RetryOptions } from "./retryFetch.js";
+import type { FetchLike } from "./types.js";
 
 export interface ResilientFetchOptions {
   readonly provider: string;

@@ -1,5 +1,5 @@
-import { QuotaExceededError, QuotaUnavailableError } from "../quota/errors";
-import type { FetchLike } from "./types";
+import { QuotaExceededError, QuotaUnavailableError } from "../quota/errors.js";
+import type { FetchLike } from "./types.js";
 
 export interface RetryOptions {
   /** Intentos totales, incluido el primero. */

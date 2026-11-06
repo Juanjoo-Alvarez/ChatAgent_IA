@@ -3,7 +3,7 @@ import type {
   Movie,
   MovieField,
   MovieReference
-} from "./types";
+} from "./types.js";
 
 export const TMDB_WEB_BASE_URL = "https://www.themoviedb.org";
 export const IMDB_WEB_BASE_URL = "https://www.imdb.com";

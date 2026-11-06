@@ -1,4 +1,4 @@
-import type { QuotaWindowUsage } from "./types";
+import type { QuotaWindowUsage } from "./types.js";
 
 /** La cuota del proveedor está agotada; la solicitud no se envió ni se contó. */
 export class QuotaExceededError extends Error {

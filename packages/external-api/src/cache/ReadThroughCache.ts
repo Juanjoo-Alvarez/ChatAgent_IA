@@ -1,4 +1,4 @@
-import type { CacheStore } from "./types";
+import type { CacheStore } from "./types.js";
 
 export interface ReadThroughCacheOptions {
   /** Errores del almacenamiento; la caché nunca impide responder. */

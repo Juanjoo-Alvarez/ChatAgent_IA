@@ -1,5 +1,5 @@
-import type { RedisLike } from "../redis";
-import type { CacheStore } from "./types";
+import type { RedisLike } from "../redis.js";
+import type { CacheStore } from "./types.js";
 
 export const DEFAULT_CACHE_KEY_PREFIX = "agichat:cache";
 

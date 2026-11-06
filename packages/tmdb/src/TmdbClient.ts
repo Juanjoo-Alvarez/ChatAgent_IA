@@ -6,7 +6,7 @@ import {
 } from "@agichat/external-api";
 import type { CacheStore, FetchLike } from "@agichat/external-api";
 
-import { TmdbError, errorFromResponse } from "./errors";
+import { TmdbError, errorFromResponse } from "./errors.js";
 import {
   comparisonKey,
   hasValidTmdbId,
@@ -14,7 +14,7 @@ import {
   normalizeMovie,
   readImdbId,
   type ImdbLookup
-} from "./normalize";
+} from "./normalize.js";
 import type {
   AppliedFilters,
   CandidateCriteria,
@@ -28,7 +28,7 @@ import type {
   MoviePage,
   MovieSearchResult,
   SearchMoviesParams
-} from "./types";
+} from "./types.js";
 import {
   assertGenreCount,
   assertLanguageCode,
@@ -39,7 +39,7 @@ import {
   assertQuery,
   assertSortBy,
   assertYearCriteria
-} from "./validation";
+} from "./validation.js";
 
 export const TMDB_API_BASE_URL = "https://api.themoviedb.org/3";
 export const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
