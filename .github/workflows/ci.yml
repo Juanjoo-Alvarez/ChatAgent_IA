@@ -21,6 +21,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # Redis permite ejecutar las pruebas de cuotas y caché entre réplicas.
+    services:
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -51,6 +63,8 @@ jobs:
 
       - name: Test with coverage
         run: pnpm test:coverage
+        env:
+          REDIS_URL: redis://localhost:6379
 
       - name: Upload coverage reports
         if: always()
