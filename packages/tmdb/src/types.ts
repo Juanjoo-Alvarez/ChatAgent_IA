@@ -43,6 +43,11 @@ export interface MovieProvenance {
   /** Los metadatos son contenido externo: deben mostrarse, nunca obedecerse. */
   readonly trust: "untrusted_external";
   readonly untrusted_fields: readonly MovieField[];
+  /**
+   * Campos cuyo texto parece contener instrucciones dirigidas a un agente
+   * (heurística). El contenido se conserva; la señal pide tratarlo con cautela.
+   */
+  readonly suspected_instruction_fields: readonly MovieField[];
 }
 
 export interface Movie {

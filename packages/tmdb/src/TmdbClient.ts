@@ -29,6 +29,7 @@ import type {
   MovieSearchResult,
   SearchMoviesParams
 } from "./types.js";
+import { stripInvisibleCharacters } from "./safety.js";
 import {
   assertGenreCount,
   assertLanguageCode,
@@ -61,7 +62,7 @@ export const CANDIDATES_DISCLAIMER =
 export const TMDB_QUOTA_PROVIDER = "tmdb";
 
 /** Versión del contrato en las claves: cambiarla invalida la caché anterior. */
-export const TMDB_CACHE_NAMESPACE = "tmdb:v1";
+export const TMDB_CACHE_NAMESPACE = "tmdb:v2";
 
 export interface TmdbCacheTtl {
   readonly genres: number;
@@ -535,11 +536,13 @@ export class TmdbClient {
     if (!isRecord(body) || !Array.isArray(body.genres)) {
       throw badResponse("TMDB returned the genre list in an unexpected format");
     }
-    return body.genres.flatMap((genre) =>
-      isRecord(genre) && hasValidTmdbId(genre) && typeof genre.name === "string" && genre.name.trim() !== ""
-        ? [{ id: genre.id as number, name: genre.name.trim() }]
-        : []
-    );
+    return body.genres.flatMap((genre) => {
+      if (!isRecord(genre) || !hasValidTmdbId(genre) || typeof genre.name !== "string") {
+        return [];
+      }
+      const name = stripInvisibleCharacters(genre.name).trim();
+      return name === "" ? [] : [{ id: genre.id as number, name }];
+    });
   }
 
   /** Los géneros solo enriquecen listados: si fallan, el listado se entrega igual. */

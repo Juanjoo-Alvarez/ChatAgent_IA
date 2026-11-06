@@ -150,7 +150,7 @@ pueden aplicar y aparecen en `ignored_filters`.
 | `reference` | `{ kind, id, url }` | `imdb` si hay identificador válido; si no, `tmdb`. |
 | `tmdb_url` | string | Ficha de TMDB, siempre disponible. |
 | `field_status` | objeto | Estado de cada campo (tabla siguiente). |
-| `provenance` | objeto | `{ source: "tmdb", trust: "untrusted_external", untrusted_fields }`. |
+| `provenance` | objeto | `{ source: "tmdb", trust: "untrusted_external", untrusted_fields, suspected_instruction_fields }`. |
 
 | Estado | Significado |
 | --- | --- |
@@ -203,8 +203,14 @@ empieza por `Input validation error`.
 Títulos, sinopsis y géneros provienen de TMDB y pueden contener texto
 malicioso, por ejemplo una sinopsis que pide ignorar instrucciones.
 
-- Se entregan **sin modificar** dentro de campos de datos, nunca como parte de
-  las instrucciones del servidor ni de las descripciones de herramientas.
+- Se entregan sin modificar su texto visible y solo dentro de campos de
+  datos, nunca como parte de las instrucciones del servidor ni de las
+  descripciones de herramientas.
+- Se eliminan caracteres invisibles que pueden ocultar texto (controles,
+  overrides bidireccionales, espacios de ancho cero, "tag characters").
+- `provenance.suspected_instruction_fields` señala, mediante una heurística,
+  los campos que parecen instrucciones. No elimina contenido; ver
+  [evaluation-scenarios.md](./evaluation-scenarios.md).
 - Cada película declara `provenance.trust = "untrusted_external"` y cada
   respuesta incluye `content_notice`.
 - El agente debe mostrarlos como información de la película y no ejecutar

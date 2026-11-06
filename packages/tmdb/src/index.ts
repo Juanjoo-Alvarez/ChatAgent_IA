@@ -52,4 +52,5 @@ export {
   type SearchMoviesParams,
   type SortOption
 } from "./types.js";
+export { looksLikeInstructions, stripInvisibleCharacters } from "./safety.js";
 export { MAX_PAGE, MAX_QUERY_LENGTH, MAX_YEAR, MIN_YEAR } from "./validation.js";

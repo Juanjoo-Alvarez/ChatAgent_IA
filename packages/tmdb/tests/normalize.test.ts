@@ -162,7 +162,8 @@ describe("normalizeMovie", () => {
     expect(movie?.provenance).toEqual({
       source: "tmdb",
       trust: "untrusted_external",
-      untrusted_fields: ["title", "original_title", "overview", "genres"]
+      untrusted_fields: ["title", "original_title", "overview", "genres"],
+      suspected_instruction_fields: ["overview"]
     });
   });
 

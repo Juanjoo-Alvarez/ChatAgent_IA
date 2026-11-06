@@ -4,6 +4,7 @@ import type {
   MovieField,
   MovieReference
 } from "./types.js";
+import { looksLikeInstructions, stripInvisibleCharacters } from "./safety.js";
 
 export const TMDB_WEB_BASE_URL = "https://www.themoviedb.org";
 export const IMDB_WEB_BASE_URL = "https://www.imdb.com";
@@ -52,7 +53,8 @@ function readText(value: unknown): FieldRead<string> {
   if (typeof value !== "string") {
     return read("invalid");
   }
-  const trimmed = value.trim();
+  // Un texto formado solo por caracteres invisibles se considera vacío.
+  const trimmed = stripInvisibleCharacters(value).trim();
   return trimmed === "" ? read("empty") : read("present", trimmed);
 }
 
@@ -113,11 +115,10 @@ function readGenres(
     if (genres.length === 0) {
       return read("empty", []);
     }
-    const names = genres.flatMap((genre) =>
-      isRecord(genre) && typeof genre.name === "string" && genre.name.trim() !== ""
-        ? [genre.name.trim()]
-        : []
-    );
+    const names = genres.flatMap((genre) => {
+      const name = isRecord(genre) ? readText(genre.name).value : null;
+      return name === null ? [] : [name];
+    });
     return names.length > 0 ? read("present", names) : read("invalid", []);
   }
 
@@ -234,16 +235,28 @@ export function normalizeMovie(raw: unknown, context: NormalizeContext): Movie |
     provenance: {
       source: "tmdb",
       trust: "untrusted_external",
-      untrusted_fields: UNTRUSTED_FIELDS
+      untrusted_fields: UNTRUSTED_FIELDS,
+      suspected_instruction_fields: suspectedInstructionFields({
+        title: title.value,
+        original_title: originalTitle.value,
+        overview: overview.value,
+        genres: genres.value?.join(", ") ?? null
+      })
     }
   };
+}
+
+function suspectedInstructionFields(values: Partial<Record<MovieField, string | null>>): MovieField[] {
+  return (Object.entries(values) as [MovieField, string | null][])
+    .filter(([, value]) => value !== null && looksLikeInstructions(value))
+    .map(([field]) => field);
 }
 
 /** Clave de comparación insensible a mayúsculas, tildes y espacios extremos. */
 export function comparisonKey(value: string): string {
   return value
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();

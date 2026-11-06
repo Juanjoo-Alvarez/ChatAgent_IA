@@ -29,6 +29,13 @@ export interface ApplicationDependencies {
   /** Transporte HTTP hacia TMDB; en pruebas se reemplaza por respuestas controladas. */
   readonly fetch?: FetchLike | undefined;
   readonly connectRedis?: ((url: string) => RedisConnection) | undefined;
+  /**
+   * Almacenamientos ya creados. Tienen prioridad sobre `sharedStore`; permiten
+   * que varias instancias compartan contadores y caché, como réplicas.
+   */
+  readonly stores?: { readonly quota: QuotaStore; readonly cache: CacheStore } | undefined;
+  /** Opciones del cliente TMDB que no provienen del entorno (por ejemplo, reintentos en pruebas). */
+  readonly retry?: { readonly sleep?: (ms: number, signal: AbortSignal | undefined) => Promise<void> } | undefined;
 }
 
 export interface Application {
@@ -45,7 +52,10 @@ export function createApplication(config: ServerConfig, dependencies: Applicatio
   let quotaStore: QuotaStore;
   let cacheStore: CacheStore;
 
-  if (config.sharedStore === "redis") {
+  if (dependencies.stores !== undefined) {
+    quotaStore = dependencies.stores.quota;
+    cacheStore = dependencies.stores.cache;
+  } else if (config.sharedStore === "redis") {
     if (config.redisUrl === null || dependencies.connectRedis === undefined) {
       throw new Error("A Redis connection is required when SHARED_STORE=redis");
     }
@@ -79,6 +89,7 @@ export function createApplication(config: ServerConfig, dependencies: Applicatio
       quota,
       fetch: dependencies.fetch,
       retry: {
+        ...(dependencies.retry?.sleep === undefined ? {} : { sleep: dependencies.retry.sleep }),
         onRetry: (event) => logger.info("tmdb_retry", { ...event })
       }
     }),
