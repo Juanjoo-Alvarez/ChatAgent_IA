@@ -52,6 +52,11 @@ describe("Redis session adapter failure handling", () => {
     expect(await store.get("id")).toEqual({ tokenHash: "hash", turns: [] });
     redis.get.mockResolvedValue(JSON.stringify({ tokenHash: "hash", turns: [turn] }));
     expect((await store.get("id"))?.turns).toEqual([turn]);
+    // Redis guarda cada turno como JSON opaco para no convertir arrays vacíos en objetos.
+    redis.get.mockResolvedValue(JSON.stringify({ tokenHash: "hash", turns: [JSON.stringify(turn)] }));
+    expect((await store.get("id"))?.turns).toEqual([turn]);
+    expect((await store.get("id"))?.turns[0]?.frame.references).toEqual([]);
+    expect((await store.get("id"))?.turns[0]?.frame.actions).toEqual([]);
     redis.eval.mockResolvedValue(1);
     expect(await store.acquire("id", "hash", "owner", 50)).toBe(true);
     expect(await store.commit("id", "owner", turn, 100)).toBe(true);

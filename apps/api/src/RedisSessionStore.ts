@@ -14,7 +14,8 @@ if redis.call('GET', KEYS[2]) ~= ARGV[1] then return 0 end
 local raw = redis.call('GET', KEYS[1])
 if not raw then return 0 end
 local session = cjson.decode(raw)
-table.insert(session.turns, cjson.decode(ARGV[2]))
+-- Conservar el turno como JSON opaco: cjson transforma [] en {} al recodificar.
+table.insert(session.turns, ARGV[2])
 while #session.turns > 20 do table.remove(session.turns, 1) end
 redis.call('SET', KEYS[1], cjson.encode(session), 'PX', ARGV[3])
 return 1`;
@@ -33,9 +34,12 @@ export class RedisSessionStore implements SessionStore {
   public async get(id: string): Promise<Session | null> {
     const raw = await this.redis.get(this.key(id));
     if (raw === null) { return null; }
-    const session = JSON.parse(raw) as Session;
-    // Redis Lua representa una tabla vacía como objeto; la normalizamos al leer.
-    return { tokenHash: session.tokenHash, turns: Array.isArray(session.turns) ? session.turns : [] };
+    const session = JSON.parse(raw) as { tokenHash: string; turns: readonly (SavedTurn | string)[] };
+    // Lua solo recodifica el contenedor. El JSON de cada turno conserva arrays y tipos.
+    const turns = Array.isArray(session.turns)
+      ? session.turns.map((turn: SavedTurn | string) => typeof turn === "string" ? JSON.parse(turn) as SavedTurn : turn)
+      : [];
+    return { tokenHash: session.tokenHash, turns };
   }
   public async acquire(id: string, tokenHash: string, owner: string, leaseMs: number): Promise<boolean> {
     return await this.redis.eval(ACQUIRE, 2, this.key(id), `${this.key(id)}:lock`, tokenHash, owner, leaseMs) === 1;
