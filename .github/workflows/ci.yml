@@ -18,7 +18,8 @@ concurrency:
 jobs:
   quality-gate:
     name: Quality gate
-    runs-on: ubuntu-latest
+    # Fijar la versión evita migraciones automáticas de ubuntu-latest.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     # Redis permite ejecutar las pruebas de cuotas y caché entre réplicas.
