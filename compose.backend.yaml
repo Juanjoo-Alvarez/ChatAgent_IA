@@ -1,0 +1,62 @@
+# Complementa compose.yaml; ejecutar con ambos archivos, no por separado.
+x-api: &api
+  build:
+    context: .
+    dockerfile: infra/backend.Dockerfile
+  environment:
+    CHAT_HOST: 0.0.0.0
+    CHAT_PORT: 8000
+    CHAT_ALLOWED_ORIGINS: ${CHAT_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+    AGENT_MODE: ${AGENT_MODE:-ollama}
+    TOOLS_MODE: mcp
+    MCP_URL: http://mcp:8001/mcp
+    OLLAMA_URL: http://host.docker.internal:11434
+    OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+    SESSION_STORE: redis
+    REDIS_URL: redis://redis:6379
+  extra_hosts:
+    - host.docker.internal:host-gateway
+  depends_on:
+    redis:
+      condition: service_healthy
+    mcp:
+      condition: service_started
+
+services:
+  mcp:
+    profiles: [backend]
+    build:
+      context: .
+      dockerfile: infra/backend.Dockerfile
+    command: [node, apps/mcp-server/dist/main.js]
+    environment:
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8001
+      MCP_ALLOWED_HOSTS: mcp:8001,127.0.0.1:8001,localhost:8001
+      TMDB_READ_ACCESS_TOKEN: ${TMDB_READ_ACCESS_TOKEN:?Define TMDB_READ_ACCESS_TOKEN}
+      QUOTA_TMDB: ${QUOTA_TMDB:?Define QUOTA_TMDB}
+      SHARED_STORE: redis
+      REDIS_URL: redis://redis:6379
+    ports:
+      - 127.0.0.1:8001:8001
+    depends_on:
+      redis:
+        condition: service_healthy
+  api:
+    <<: *api
+    profiles: [backend]
+    ports:
+      - 127.0.0.1:8000:8000
+  api-replica:
+    <<: *api
+    profiles: [scale]
+    ports:
+      - 127.0.0.1:8002:8000
+  proxy:
+    profiles: [scale]
+    image: nginx:1.28-alpine
+    ports:
+      - 127.0.0.1:8080:8080
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on: [api, api-replica]
