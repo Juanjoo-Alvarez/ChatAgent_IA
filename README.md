@@ -185,3 +185,9 @@ El equipo utiliza GitHub Flow:
 6. Integra únicamente cuando el job `Quality gate` esté en verde.
 
 No se permiten pushes directos a `main`. Consulta [AGENTS.md](./AGENTS.md) para las convenciones completas y [docs/RELEASING.md](./docs/RELEASING.md) para el proceso de distribución.
+
+## Proyecto 2
+
+La [guía del backend del agente](./docs/BACKEND-AGENTE.md) explica el arranque
+local, el protocolo WebSocket para José, la extensión MCP para Daniel, las
+sesiones compartidas y la ejecución de evals.

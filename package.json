@@ -6,6 +6,10 @@
   "scripts": {
     "build": "pnpm --recursive --if-present run build",
     "dev:demo": "pnpm --filter @agichat/demo dev",
+    "dev:api": "pnpm --filter @agichat/api... build && pnpm --filter @agichat/api dev",
+    "dev:mcp": "pnpm --filter @agichat/mcp-server... build && pnpm --filter @agichat/mcp-server dev",
+    "eval:agent": "pnpm --filter @agichat/agent eval",
+    "eval:agent:live": "pnpm --filter @agichat/agent... build && node scripts/eval-agent-live.mjs",
     "lint": "eslint . --max-warnings 0",
     "release:prepare": "pnpm build && node scripts/prepare-release.mjs stage && pnpm --filter \"./packages/*\" pack --recursive --pack-destination release-artifacts && node scripts/prepare-release.mjs checksum",
     "test": "pnpm --recursive --if-present run test",
