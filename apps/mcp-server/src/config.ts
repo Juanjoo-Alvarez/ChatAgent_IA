@@ -21,6 +21,7 @@ export interface ServerConfig {
   readonly sharedStore: SharedStoreKind;
   readonly redisUrl: string | null;
   readonly quotaPolicies: Readonly<Record<string, ProviderQuotaPolicy>>;
+  readonly books?: { readonly apiKey: string | undefined; readonly timeoutMs: number | undefined };
 }
 
 export class ConfigError extends Error {
@@ -69,7 +70,7 @@ export function loadConfig(env: Env): ServerConfig {
 
   let quotaPolicies: Record<string, ProviderQuotaPolicy>;
   try {
-    quotaPolicies = quotaPoliciesFromEnv(env, [TMDB_QUOTA_PROVIDER]);
+    quotaPolicies = quotaPoliciesFromEnv(env, [TMDB_QUOTA_PROVIDER, ...(optional(env, "GOOGLE_BOOKS_ENABLED") === "true" ? ["google-books"] : [])]);
   } catch (error) {
     throw new ConfigError(error instanceof Error ? error.message : String(error));
   }
@@ -95,6 +96,9 @@ export function loadConfig(env: Env): ServerConfig {
     sharedStore,
     // Con varias réplicas, Redis es obligatorio para compartir cuotas y caché.
     redisUrl: sharedStore === "redis" ? required(env, "REDIS_URL") : null,
-    quotaPolicies
+    quotaPolicies,
+    ...(optional(env, "GOOGLE_BOOKS_ENABLED") === "true" ? { books: {
+      apiKey: optional(env, "GOOGLE_BOOKS_API_KEY"), timeoutMs: positiveInteger(env, "GOOGLE_BOOKS_TIMEOUT_MS")
+    } } : {})
   };
 }

@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import type { Logger } from "./logger.js";
 import { registerMovieTools, type MovieCatalog } from "./tools/movieTools.js";
+import { registerBookTools, type BookCatalog } from "./tools/bookTools.js";
 
 export const SERVER_NAME = "agichat-tools";
 export const SERVER_VERSION = "0.2.1";
@@ -9,6 +10,7 @@ export const SERVER_VERSION = "0.2.1";
 export interface ToolDependencies {
   readonly movies: MovieCatalog;
   readonly logger: Logger;
+  readonly books?: BookCatalog;
 }
 
 /**
@@ -28,5 +30,6 @@ export function createMcpServer(dependencies: ToolDependencies): McpServer {
   );
 
   registerMovieTools(server, dependencies);
+  if (dependencies.books !== undefined) { registerBookTools(server, dependencies.books, dependencies.movies); }
   return server;
 }
