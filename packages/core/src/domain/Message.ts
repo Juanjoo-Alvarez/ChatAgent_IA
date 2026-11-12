@@ -1,3 +1,5 @@
+import type { MessageCard, MessageReference } from "./MessageContent";
+
 // Roles admitidos por la conversación.
 export type MessageRole = "user" | "agent";
 
@@ -10,6 +12,8 @@ export interface MessageProps {
   readonly content: string;
   readonly timestamp: Date;
   readonly status: MessageStatus;
+  readonly cards?: readonly MessageCard[];
+  readonly references?: readonly MessageReference[];
 }
 
 const ALLOWED_TRANSITIONS: Readonly<
@@ -28,6 +32,8 @@ export class Message {
   public readonly role: MessageRole;
   public readonly content: string;
   public readonly status: MessageStatus;
+  public readonly cards: readonly MessageCard[];
+  public readonly references: readonly MessageReference[];
 
   private readonly timestampValue: Date;
 
@@ -50,6 +56,11 @@ export class Message {
     this.content = props.content;
     this.timestampValue = new Date(props.timestamp.getTime());
     this.status = props.status;
+    this.cards = Object.freeze((props.cards ?? []).map((card) => Object.freeze({
+      ...card,
+      image: card.image === null ? null : Object.freeze({ ...card.image })
+    })));
+    this.references = Object.freeze((props.references ?? []).map((reference) => Object.freeze({ ...reference })));
   }
 
   public get timestamp(): Date {
@@ -74,7 +85,9 @@ export class Message {
       role: this.role,
       content: this.content,
       timestamp: this.timestampValue,
-      status
+      status,
+      cards: this.cards,
+      references: this.references
     });
   }
 }

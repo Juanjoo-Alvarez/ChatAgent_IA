@@ -2,9 +2,10 @@ import {
   MockTransportAdapter,
   type ChatWidgetProps
 } from "@agichat/react";
+import { WebSocketTransportAdapter } from "@agichat/transport-websocket";
 
 import { AGICHAT_WIDGET_TAG } from "./constants";
-import { mountChatWidget, type UnmountChatWidget } from "./mountChatWidget";
+import { mountChatWidget, updateChatWidget, type UnmountChatWidget } from "./mountChatWidget";
 
 export type AGIChatTransport = ChatWidgetProps["transport"];
 export type AGIChatWidgetTheme = NonNullable<ChatWidgetProps["theme"]>;
@@ -25,13 +26,13 @@ const hostStyles = `
 export class AGIChatWidgetElement extends HTMLElement {
   public static get observedAttributes(): string[] {
     // El navegador invoca attributeChangedCallback solo para esta lista.
-    return ["title", "session-id", "placeholder", "empty-state-message"];
+    return ["title", "session-id", "placeholder", "empty-state-message", "websocket-url", "tmdb-credits"];
   }
 
   private readonly mountTarget: HTMLDivElement;
   private unmountWidget: UnmountChatWidget | undefined;
   private injectedTransport: AGIChatTransport | undefined;
-  private ownedTransport: MockTransportAdapter | undefined;
+  private ownedTransport: MockTransportAdapter | WebSocketTransportAdapter | undefined;
   private themeOverride: AGIChatWidgetTheme | undefined;
 
   public constructor() {
@@ -49,7 +50,7 @@ export class AGIChatWidgetElement extends HTMLElement {
   }
 
   public get transport(): AGIChatTransport {
-    // Sin transporte inyectado, el componente crea un mock listo para la demo.
+    // El transporte inyectado pertenece al consumidor; el predeterminado, al elemento.
     return this.injectedTransport ?? this.getOwnedTransport();
   }
 
@@ -95,34 +96,35 @@ export class AGIChatWidgetElement extends HTMLElement {
   }
 
   public attributeChangedCallback(
-    _name: string,
+    name: string,
     previousValue: string | null,
     nextValue: string | null
   ): void {
-    if (previousValue === nextValue || !this.isConnected) {
+    if (previousValue === nextValue) {
       return;
     }
 
-    this.renderWidget();
+    if (name === "websocket-url" || name === "session-id") { this.disposeOwnedTransport(); }
+    if (this.isConnected) { this.renderWidget(); }
   }
 
-  private getOwnedTransport(): MockTransportAdapter {
-    this.ownedTransport ??= new MockTransportAdapter();
+  private getOwnedTransport(): MockTransportAdapter | WebSocketTransportAdapter {
+    const endpoint = this.getAttribute("websocket-url");
+    this.ownedTransport ??= endpoint === null
+      ? new MockTransportAdapter()
+      : new WebSocketTransportAdapter({ url: endpoint });
     return this.ownedTransport;
   }
 
   private renderWidget(): void {
-    // React no admite crear otra raíz sobre el mismo nodo; primero se desmonta
-    // la instancia anterior y luego se aplican atributos y propiedades nuevas.
-    this.teardownWidget();
-
     const title = this.getAttribute("title");
     const sessionId = this.getAttribute("session-id");
     const placeholder = this.getAttribute("placeholder");
     const emptyStateMessage = this.getAttribute("empty-state-message");
 
-    this.unmountWidget = mountChatWidget(this.mountTarget, {
+    const props: ChatWidgetProps = {
       transport: this.transport,
+      showTmdbCredits: this.hasAttribute("tmdb-credits"),
       ...(title !== null ? { title } : {}),
       ...(sessionId !== null && sessionId.trim().length > 0
         ? { sessionId }
@@ -130,7 +132,10 @@ export class AGIChatWidgetElement extends HTMLElement {
       ...(placeholder !== null ? { placeholder } : {}),
       ...(emptyStateMessage !== null ? { emptyStateMessage } : {}),
       ...(this.themeOverride !== undefined ? { theme: this.themeOverride } : {})
-    });
+    };
+    if (!updateChatWidget(this.mountTarget, props)) {
+      this.unmountWidget = mountChatWidget(this.mountTarget, props);
+    }
   }
 
   private teardownWidget(): void {

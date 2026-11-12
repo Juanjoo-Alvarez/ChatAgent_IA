@@ -55,9 +55,9 @@ h1 {
   max-width: 680px;
   margin: 0;
   color: #111827;
-  font-size: clamp(2.6rem, 6vw, 5.3rem);
-  line-height: 0.98;
-  letter-spacing: -0.055em;
+  font-size: clamp(2.6rem, 6vw, 4.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
 }
 
 .lead {
@@ -114,6 +114,7 @@ h1 {
 }
 
 .scenario-card {
+  margin-top: 28px;
   min-height: 260px;
   padding: 24px;
   border: 1px solid rgba(203, 213, 225, 0.8);

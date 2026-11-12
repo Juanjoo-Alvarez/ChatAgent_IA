@@ -23,6 +23,42 @@ const createHarness = () => {
 };
 
 describe("ChatEngine", () => {
+  it("publishes connection state, capabilities and asynchronous errors", () => {
+    const { engine, transport } = createHarness();
+    expect(engine.getState()).toMatchObject({ connectionStatus: "idle", capabilityNotice: null, mode: null, transportError: null });
+    transport.emit({ type: "connection-state", status: "connecting" });
+    transport.emit({ type: "session-ready", notice: "Puedo comparar películas y libros.", mode: "fixture" });
+    transport.emit({ type: "connection-state", status: "connected" });
+    expect(engine.getState()).toMatchObject({ connectionStatus: "connected", capabilityNotice: "Puedo comparar películas y libros.", mode: "fixture" });
+    transport.emit({ type: "agent-typing", isTyping: true });
+    const error = new Error("Sin conexión");
+    transport.emit({ type: "transport-error", error });
+    expect(engine.getState()).toMatchObject({ transportError: error, isAgentTyping: false });
+    transport.emit({ type: "session-ready", notice: "Reconectado", mode: "fixture" });
+    expect(engine.getState().transportError).toBeNull();
+    transport.emit({ type: "agent-typing", isTyping: true });
+    transport.emit({ type: "connection-state", status: "disconnected" });
+    expect(engine.getState().isAgentTyping).toBe(false);
+  });
+
+  it("keeps rich responses and publishes actions separately from message text", () => {
+    const { engine, transport } = createHarness();
+    const handler = vi.fn();
+    const unsubscribe = engine.onAction(handler);
+    const reference = { provider: "imdb", id: "tt1234567" };
+    const card = { id: "1", title: "Película", subtitle: null, image: null };
+    transport.emit({ type: "agent-message", message: { id: "agent-rich", content: "Recomendación", timestamp: NOW, cards: [card], references: [reference] } });
+    const event = { type: "action" as const, requestId: "request-1", action: { type: "open-reference" as const, reference } };
+    transport.emit(event);
+    expect(engine.getMessages()[0]).toMatchObject({ cards: [card], references: [reference] });
+    expect(handler).toHaveBeenCalledWith(event);
+    unsubscribe();
+    transport.emit(event);
+    expect(handler).toHaveBeenCalledTimes(1);
+    engine.dispose();
+    expect(() => engine.onAction(handler)).toThrow("ChatEngine has been disposed");
+  });
+
   it("publishes sending immediately and sent after a successful send", async () => {
     const { engine, transport } = createHarness();
     const deferred = transport.deferNextSend();

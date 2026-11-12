@@ -47,7 +47,8 @@ una película ficticia, sin póster ni referencia real, y se identifican en la r
 Este modo no usa un LLM, no consulta TMDB y no sirve para evaluar al modelo real.
 
 En otra terminal puede ejecutarse `pnpm dev:demo` para disponer del origen local
-permitido. La demo todavía necesita el adaptador WebSocket que implementará José.
+permitido. La demo utiliza el adaptador WebSocket y muestra el modo informado
+por la API. Ver [WIDGET-INTEGRACION.md](./WIDGET-INTEGRACION.md).
 
 ## Datos reales y modelo elegido
 
@@ -169,14 +170,15 @@ Opcionalmente, el cliente puede indicar la selección exacta en el frame:
 
 El backend valida intención y evidencia, y devuelve una acción
 `{ "type": "open-reference", "reference": { "provider": "imdb", "id": "tt9950101" } }`.
-José construye la URL con `referenceUrl` de `@agichat/protocol`. Nunca ejecutar
+El cliente construye la URL con `referenceUrl` de `@agichat/protocol`. Nunca ejecutar
 JavaScript o abrir URLs extraídas del texto del modelo. Los replays omiten acciones
 para evitar abrir otra pestaña; deduplicar también por petición en el cliente.
 
 Reservar la pestaña durante el envío explícito de la petición y navegarla al
 recibir la acción validada, o documentar el permiso de ventanas emergentes que
 requiera el navegador. Cerrar la reserva si hay error o cancelación. La apertura
-real y las condiciones del navegador todavía deben comprobarse en el widget.
+real y las condiciones del navegador todavía deben comprobarse manualmente;
+la reserva y su limpieza están implementadas y cubiertas por tests con ventanas simuladas.
 
 ## Contrato para Daniel
 

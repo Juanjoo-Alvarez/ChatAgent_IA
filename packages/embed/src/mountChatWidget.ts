@@ -65,3 +65,11 @@ export const mountChatWidget = (
 
 export const unmountChatWidget = (target: ChatWidgetTarget): boolean =>
   unmountResolvedTarget(resolveTarget(target));
+
+/** Actualiza props en la raíz existente sin perder la conversación de React. */
+export const updateChatWidget = (target: ChatWidgetTarget, props: ChatWidgetProps): boolean => {
+  const root = mountedRoots.get(resolveTarget(target));
+  if (root === undefined) { return false; }
+  root.render(createElement(ChatWidget, props));
+  return true;
+};

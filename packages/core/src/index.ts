@@ -4,6 +4,7 @@ export {
   ChatEngine,
   type ChatEngineOptions,
   type ChatEngineState,
+  type ActionHandler,
   type MessagesChangeHandler,
   type StateChangeHandler
 } from "./ChatEngine";
@@ -20,8 +21,11 @@ export {
   type SessionProps
 } from "./domain/Session";
 export type {
+  ConnectionStatus,
+  TransportAction,
   IncomingAgentMessage,
   ITransportAdapter,
   TransportEvent,
   TransportEventHandler
 } from "./ports/ITransportAdapter";
+export type { MessageCard, MessageReference, ReferenceAction } from "./domain/MessageContent";

@@ -3,60 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Demostración de integración del widget conversacional AGIChat"
-    />
-    <title>AGIChat · Demostración</title>
+    <meta name="description" content="Recomendaciones de películas y comparaciones con sus libros mediante AGIChat." />
+    <title>AGIChat · Películas y libros</title>
   </head>
   <body>
     <main class="demo-shell">
       <section class="demo-copy" aria-labelledby="demo-title">
-        <p class="eyebrow">AGIChat Widget SDK</p>
-        <h1 id="demo-title">Una conversación para cada experiencia</h1>
-        <p class="lead">
-          Cambia de escenario para comprobar cómo el mismo componente se
-          adapta a distintos productos sin modificar su lógica interna.
-        </p>
-
-        <div class="scenario-picker" aria-label="Escenarios de demostración">
-          <button class="scenario-button" type="button" data-scenario="support">
-            Soporte
-          </button>
-          <button class="scenario-button" type="button" data-scenario="sales">
-            Ventas
-          </button>
-          <button class="scenario-button" type="button" data-scenario="onboarding">
-            Incorporación
-          </button>
-        </div>
-
-        <article class="scenario-card" aria-live="polite">
-          <p class="scenario-label">Caso de uso</p>
-          <h2 data-scenario-title></h2>
-          <p data-scenario-description></p>
-          <h3>Mensajes sugeridos</h3>
+        <h1 id="demo-title">Encuentra tu próxima película</h1>
+        <p class="lead">Cuéntanos qué te gusta. Descubre una película y, si tiene libro,
+          compara la adaptación antes de decidir qué ver.</p>
+        <article class="scenario-card" aria-labelledby="prompts-title">
+          <h2 id="prompts-title">Prueba la conversación</h2>
+          <p>Comienza con una recomendación. Después puedes comparar el libro o pedir
+            que se abra una referencia de IMDb o Google Books.</p>
           <div class="prompt-list" data-prompt-list></div>
           <p class="copy-status" data-copy-status role="status"></p>
         </article>
-
-        <p class="demo-note">
-          La respuesta se genera localmente con el transporte mock. Prueba la
-          pregunta sobre la vida, el universo y todo lo demás para recibir la
-          respuesta del wireframe.
-        </p>
+        <p class="demo-note">Las comparaciones dependen de las fuentes disponibles.
+          Para abrir referencias, permite ventanas emergentes para este sitio si tu navegador las bloquea.</p>
       </section>
-
-      <section class="widget-stage" aria-label="Vista previa del widget">
-        <agi-chat-widget
-          title="Soporte de producto"
-          session-id="demo-support"
-          placeholder="Describe tu consulta…"
-          empty-state-message="Hola, ¿cómo podemos ayudarte hoy?"
-        ></agi-chat-widget>
+      <section class="widget-stage" aria-label="Asistente de películas">
+        <p hidden role="alert" data-configuration-error>El chat no está disponible en este momento. Intenta más tarde.</p>
+        <agi-chat-widget tmdb-credits title="AGIChat · Películas" placeholder="¿Qué te gustaría ver?"
+          empty-state-message="Recomiéndame una película según mis gustos."></agi-chat-widget>
       </section>
     </main>
-
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

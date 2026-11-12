@@ -10,6 +10,7 @@ import {
   type AGIChatThemeOverride
 } from "../../theme";
 import { AgentIcon } from "../icons";
+import { RecommendationCard } from "../RecommendationCard";
 
 // react-markdown no interpreta HTML crudo por defecto (no se usa rehype-raw),
 // por lo que el contenido del agente se renderiza de forma segura sin abrir
@@ -140,6 +141,7 @@ export const MessageBubble = ({
             </Markdown>
           )}
         </div>
+        {!isUser && message.cards.map((card) => <RecommendationCard key={card.id} card={card} />)}
         {message.status === "sending" && (
           <span
             className="agichat-message__status"
