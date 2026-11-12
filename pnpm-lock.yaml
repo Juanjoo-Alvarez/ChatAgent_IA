@@ -33,6 +33,9 @@ importers:
         specifier: ^8.21.3
         version: 8.21.3
     devDependencies:
+      '@agichat/embed':
+        specifier: workspace:*
+        version: link:../../packages/embed
       '@types/node':
         specifier: ^22.20.5
         version: 22.20.5
@@ -42,6 +45,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^3.2.4
         version: 3.2.7(supports-color@7.2.0)(vitest@3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)(jsdom@25.0.1(supports-color@7.2.0))(lightningcss@1.33.0)(supports-color@7.2.0))
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1(supports-color@7.2.0)
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
