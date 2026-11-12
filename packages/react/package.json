@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@agichat/core": "workspace:*",
+    "@agichat/protocol": "workspace:*",
     "@agichat/transport-mock": "workspace:*",
     "react-markdown": "^10.1.0"
   },

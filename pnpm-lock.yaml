@@ -228,6 +228,9 @@ importers:
       '@agichat/core':
         specifier: workspace:*
         version: link:../core
+      '@agichat/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@agichat/transport-mock':
         specifier: workspace:*
         version: link:../transport-mock
