@@ -3,13 +3,19 @@ import { Message } from "./domain/Message";
 import type { Session } from "./domain/Session";
 import type {
   ITransportAdapter,
-  TransportEvent
+  TransportEvent,
+  ConnectionStatus,
+  TransportAction
 } from "./ports/ITransportAdapter";
 
 export interface ChatEngineState {
   readonly session: Session;
   readonly messages: readonly Message[];
   readonly isAgentTyping: boolean;
+  readonly connectionStatus: ConnectionStatus;
+  readonly capabilityNotice: string | null;
+  readonly mode: string | null;
+  readonly transportError: Error | null;
 }
 
 export interface ChatEngineOptions {
@@ -22,6 +28,7 @@ export type MessagesChangeHandler = (
 ) => void;
 
 export type StateChangeHandler = (state: ChatEngineState) => void;
+export type ActionHandler = (event: TransportAction) => void;
 
 const defaultCreateId = (): string => {
   // randomUUID es la opción preferida cuando el entorno la ofrece.
@@ -40,11 +47,16 @@ export class ChatEngine {
   private readonly conversation: Conversation;
   private readonly messagesChangeHandlers = new Set<MessagesChangeHandler>();
   private readonly stateChangeHandlers = new Set<StateChangeHandler>();
+  private readonly actionHandlers = new Set<ActionHandler>();
   private readonly now: () => Date;
   private readonly createId: () => string;
   private readonly unsubscribeTransport: () => void;
 
   private agentTyping = false;
+  private connectionStatus: ConnectionStatus = "idle";
+  private capabilityNotice: string | null = null;
+  private mode: string | null = null;
+  private transportError: Error | null = null;
   private disposed = false;
 
   public constructor(
@@ -100,7 +112,11 @@ export class ChatEngine {
     return {
       session: this.session,
       messages: this.getMessages(),
-      isAgentTyping: this.agentTyping
+      isAgentTyping: this.agentTyping,
+      connectionStatus: this.connectionStatus,
+      capabilityNotice: this.capabilityNotice,
+      mode: this.mode,
+      transportError: this.transportError
     };
   }
 
@@ -125,6 +141,12 @@ export class ChatEngine {
     };
   }
 
+  public onAction(handler: ActionHandler): () => void {
+    this.ensureActive();
+    this.actionHandlers.add(handler);
+    return () => { this.actionHandlers.delete(handler); };
+  }
+
   public dispose(): void {
     // dispose es idempotente para permitir limpiezas repetidas con seguridad.
     if (this.disposed) {
@@ -135,10 +157,35 @@ export class ChatEngine {
     this.unsubscribeTransport();
     this.messagesChangeHandlers.clear();
     this.stateChangeHandlers.clear();
+    this.actionHandlers.clear();
   }
 
   private handleTransportEvent(event: TransportEvent): void {
     if (this.disposed) {
+      return;
+    }
+
+    if (event.type === "action") {
+      for (const handler of this.actionHandlers) { handler(event); }
+      return;
+    }
+    if (event.type === "connection-state") {
+      this.connectionStatus = event.status;
+      if (event.status === "disconnected") { this.agentTyping = false; }
+      this.notifyState();
+      return;
+    }
+    if (event.type === "session-ready") {
+      this.capabilityNotice = event.notice;
+      this.mode = event.mode;
+      this.transportError = null;
+      this.notifyState();
+      return;
+    }
+    if (event.type === "transport-error") {
+      this.transportError = event.error;
+      this.agentTyping = false;
+      this.notifyState();
       return;
     }
 
@@ -161,7 +208,9 @@ export class ChatEngine {
         role: "agent",
         content: event.message.content,
         timestamp: event.message.timestamp,
-        status: "sent"
+        status: "sent",
+        ...(event.message.cards === undefined ? {} : { cards: event.message.cards }),
+        ...(event.message.references === undefined ? {} : { references: event.message.references })
       })
     );
     this.notifyMessagesAndState();

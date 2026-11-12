@@ -15,6 +15,23 @@ const createMessage = (
   });
 
 describe("Message", () => {
+  it("preserves rich content through status changes and isolates mutable inputs", () => {
+    const card = { id: "1", title: "Película", subtitle: "2020", image: { url: "https://example.test/poster.jpg", alt: "Póster" } };
+    const reference = { provider: "catalog", id: "1" };
+    const message = createMessage({ cards: [card], references: [reference] });
+    card.title = "Changed";
+    card.image.alt = "Changed";
+    reference.id = "Changed";
+    const sent = message.withStatus("sent");
+    expect(sent.cards[0]).toMatchObject({ title: "Película", image: { alt: "Póster" } });
+    expect(sent.references).toEqual([{ provider: "catalog", id: "1" }]);
+    expect(Object.isFrozen(sent.cards)).toBe(true);
+    expect(Object.isFrozen(sent.cards[0]?.image)).toBe(true);
+    expect(Object.isFrozen(sent.references[0])).toBe(true);
+    expect(createMessage().cards).toEqual([]);
+    expect(createMessage({ cards: [{ ...card, image: null }] }).cards[0]?.image).toBeNull();
+  });
+
   it("creates a message and protects its timestamp from external mutation", () => {
     const originalTimestamp = new Date("2026-08-25T10:00:00.000Z");
     const message = createMessage({ timestamp: originalTimestamp });

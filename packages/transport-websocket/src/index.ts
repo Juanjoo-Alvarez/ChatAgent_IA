@@ -1,6 +1,7 @@
-// API pública reservada para el transporte real del Proyecto 2.
+// API pública del transporte WebSocket del Proyecto 2.
 export {
   WebSocketTransportAdapter,
-  WebSocketTransportNotImplementedError,
+  WebSocketTransportError,
+  type WebSocketConnection,
   type WebSocketTransportAdapterOptions
 } from "./WebSocketTransportAdapter";

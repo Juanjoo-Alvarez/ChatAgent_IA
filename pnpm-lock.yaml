@@ -306,6 +306,9 @@ importers:
       '@agichat/core':
         specifier: workspace:*
         version: link:../core
+      '@agichat/protocol':
+        specifier: workspace:*
+        version: link:../protocol
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^3.2.4
