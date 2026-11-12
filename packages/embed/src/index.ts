@@ -12,10 +12,16 @@ export { AGICHAT_WIDGET_TAG } from "./constants";
 export {
   mountChatWidget,
   unmountChatWidget,
+  updateChatWidget,
   type ChatWidgetTarget,
   type UnmountChatWidget
 } from "./mountChatWidget";
 export type { ChatWidgetProps } from "@agichat/react";
+export {
+  WebSocketTransportAdapter,
+  WebSocketTransportError,
+  type WebSocketTransportAdapterOptions
+} from "@agichat/transport-websocket";
 
 // El bundle se puede importar durante SSR; el registro automático solo ocurre
 // cuando existe el registro de Custom Elements del navegador.

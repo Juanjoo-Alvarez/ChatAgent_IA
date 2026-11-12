@@ -15,8 +15,8 @@ El transporte valida por separado el identificador de la petición recibida.
 
 ## Comprobación manual en navegador
 
-Requiere integrar la demo con el transporte WebSocket y tener referencias reales
-en la conversación. El modo fixture actual del backend no aporta referencias
+La demo utiliza el transporte WebSocket; ver [WIDGET-INTEGRACION.md](./WIDGET-INTEGRACION.md).
+El recorrido requiere referencias reales en la conversación. El modo fixture actual del backend no aporta referencias
 reales ni pósteres; los tests usan datos controlados para esos casos.
 
 1. Pedir una recomendación y comprobar título, año, póster y créditos visibles.
@@ -44,6 +44,6 @@ de datos para funcionar también en el bundle IIFE y dentro del Shadow DOM.
 - [Requisitos oficiales](https://developer.themoviedb.org/docs/faq).
 - [Logo original](https://www.themoviedb.org/assets/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg).
 
-El SDK muestra créditos cuando hay tarjetas de recomendación. Una integración que
-muestre datos de TMDB únicamente como texto debe incluir también los créditos
-en su sección visible de información o créditos.
+El SDK muestra créditos cuando hay tarjetas de recomendación o cuando se activa
+`showTmdbCredits` (atributo `tmdb-credits` del Web Component). La demo los activa
+desde el inicio, también para respuestas que solo contengan texto.

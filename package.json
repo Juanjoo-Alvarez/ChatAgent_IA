@@ -5,7 +5,7 @@
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "build": "pnpm --recursive --if-present run build",
-    "dev:demo": "pnpm --filter @agichat/demo dev",
+    "dev:demo": "pnpm --filter @agichat/demo... build && pnpm --filter @agichat/demo dev",
     "dev:api": "pnpm --filter @agichat/api... build && pnpm --filter @agichat/api dev",
     "dev:mcp": "pnpm --filter @agichat/mcp-server... build && pnpm --filter @agichat/mcp-server dev",
     "eval:agent": "pnpm --filter @agichat/agent eval",

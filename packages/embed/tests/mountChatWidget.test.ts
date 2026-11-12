@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   mountChatWidget,
   unmountChatWidget,
+  updateChatWidget,
   type UnmountChatWidget
 } from "../src/mountChatWidget";
 
@@ -44,6 +45,14 @@ afterEach(() => {
 });
 
 describe("mountChatWidget", () => {
+  it("updates a mounted widget without replacing its subscription", () => {
+    const target = document.createElement("div");
+    mount(target);
+    act(() => { expect(updateChatWidget(target, { transport, title: "Películas" })).toBe(true); });
+    expect(target.textContent).toContain("Películas");
+    expect(transport.subscribe).toHaveBeenCalledOnce();
+    expect(updateChatWidget(document.createElement("div"), { transport })).toBe(false);
+  });
   it("mounts and unmounts the React widget in an element", () => {
     const target = document.createElement("div");
     document.body.append(target);

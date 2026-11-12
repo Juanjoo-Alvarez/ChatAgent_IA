@@ -33,6 +33,14 @@ bundle final.
 
 ## Validación local
 
+La demo del proyecto 2 requiere `VITE_CHAT_WEBSOCKET_URL` con la dirección pública
+WSS del backend, terminada en `/chat`, en las variables del proyecto de Vercel.
+La API debe permitir el origen exacto de la demo mediante `CHAT_ALLOWED_ORIGINS`.
+Esta variable se lee durante el build: cambiarla requiere un deployment nuevo.
+Vercel sirve el frontend estático; el backend WebSocket se aloja por separado.
+Sin esa variable, el build sigue siendo válido pero el chat aparece como no
+disponible. Ver [WIDGET-INTEGRACION.md](./WIDGET-INTEGRACION.md).
+
 Desde la raíz del repositorio:
 
 ```bash

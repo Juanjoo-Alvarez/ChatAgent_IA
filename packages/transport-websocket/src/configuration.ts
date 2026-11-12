@@ -30,7 +30,8 @@ export function resolveConfiguration(options: WebSocketTransportAdapterOptions) 
   }
   return {
     url, sessionUrl, protocols: options.protocols,
-    fetch: options.fetch ?? globalThis.fetch,
+    // Las APIs nativas del navegador requieren conservar su receptor global.
+    fetch: options.fetch ?? globalThis.fetch.bind(globalThis),
     createWebSocket: options.createWebSocket ?? ((endpoint: string, protocols?: string | string[]) => new WebSocket(endpoint, protocols)),
     createId: options.createId ?? (() => globalThis.crypto.randomUUID()),
     connectTimeoutMs, responseTimeoutMs, maxReconnectAttempts, reconnectDelayMs, maxReconnectDelayMs

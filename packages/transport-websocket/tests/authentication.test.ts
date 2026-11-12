@@ -37,7 +37,10 @@ describe("WebSocket authentication", () => {
 
   it("uses the browser APIs and UUID generator by default", async () => {
     const socket = new FakeSocket();
-    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(credentials)));
+    const fetch = vi.fn(function (this: unknown) {
+      if (this !== globalThis) { throw new TypeError("Illegal invocation"); }
+      return Promise.resolve(new Response(JSON.stringify(credentials)));
+    });
     let created = false;
     vi.stubGlobal("fetch", fetch);
     vi.stubGlobal("WebSocket", class { public constructor() { created = true; return socket; } });

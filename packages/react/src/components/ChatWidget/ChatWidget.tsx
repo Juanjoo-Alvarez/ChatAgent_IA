@@ -23,6 +23,7 @@ export interface ChatWidgetProps {
   readonly placeholder?: string;
   readonly emptyStateMessage?: string;
   readonly theme?: AGIChatThemeOverride;
+  readonly showTmdbCredits?: boolean;
 }
 
 /**
@@ -37,7 +38,8 @@ export const ChatWidget = ({
   subtitle,
   placeholder,
   emptyStateMessage = "Escribe un mensaje para comenzar la conversación.",
-  theme: themeOverride
+  theme: themeOverride,
+  showTmdbCredits = false
 }: ChatWidgetProps): ReactElement => {
   // Cada override se combina con el tema base antes de calcular estilos.
   const theme = resolveTheme(themeOverride);
@@ -123,7 +125,7 @@ export const ChatWidget = ({
         </p>
       )}
 
-      {messages.some((message) => message.role === "agent" && message.cards.length > 0) && <TmdbCredits />}
+      {(showTmdbCredits || messages.some((message) => message.role === "agent" && message.cards.length > 0)) && <TmdbCredits />}
       <InputBar
         onSend={(text) => {
           void sendMessage(text);
