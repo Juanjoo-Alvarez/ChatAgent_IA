@@ -6,8 +6,9 @@ import { authenticated, connected, message } from "./helpers.js";
 
 describe("API configuration", () => {
   it("uses a local model and a single-instance store by default", () => {
-    expect(loadApiConfig({})).toMatchObject({ mode: "ollama", ollamaModel: "qwen3:4b", port: 8000, sessionStore: "memory" });
+    expect(loadApiConfig({})).toMatchObject({ mode: "ollama", ollamaModel: "qwen3:4b-instruct-2507-q4_K_M", port: 8000, sessionStore: "memory" });
     expect(loadApiConfig({ SESSION_STORE: "redis", REDIS_URL: "redis://localhost:6379" }).sessionStore).toBe("redis");
+    expect(loadApiConfig({ OLLAMA_MODEL: " custom-model " }).ollamaModel).toBe("custom-model");
   });
   it.each([
     { AGENT_MODE: "invalid" }, { TOOLS_MODE: "invalid" }, { TOOLS_MODE: "fixture" }, { SESSION_STORE: "invalid" }, { SESSION_STORE: "redis" },

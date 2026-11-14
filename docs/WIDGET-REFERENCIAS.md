@@ -1,8 +1,12 @@
 # Referencias y créditos del widget
 
 El widget reserva una pestaña durante el envío explícito del usuario, antes de
-esperar al backend. Solo lo hace para `Abre IMDb`, `Abre Google Books` o `Open IMDb`
-(también admite `Por favor, abre…` y un identificador después del proveedor).
+esperar al backend. Cliente y servidor usan `resolveReferenceRequest` de
+`@agichat/protocol`: aceptan `Abre IMDb`, `Abre Google Books`, `Open IMDb`,
+`¿Puedes abrir IMDb?`, `¿Podrías abrir Google Books?` y `Can you open IMDb?`.
+También admiten `Por favor, abre…` y un identificador después del proveedor.
+Una negación, una orden entre comillas o incrustada en otra frase no autoriza
+la apertura. Una solicitud de ambas páginas a la vez requiere aclaración.
 La referencia debe haber aparecido en un mensaje anterior del agente en esa
 misma instancia. Si hay varias, indicar el identificador para elegir una.
 

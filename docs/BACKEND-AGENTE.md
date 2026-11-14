@@ -1,5 +1,8 @@
 # Backend del agente — integración del proyecto 2
 
+Para la primera ejecución con modelo y proveedores reales, seguir
+[Inicio local con Ollama, películas y libros](./OLLAMA-INICIO.md).
+
 Implementación inicial de Juan Jose Rivas Alvarez, carnet 24856.
 Base actualizada el 8 de noviembre de 2026: `main` en `baf740c`.
 
@@ -52,8 +55,8 @@ por la API. Ver [WIDGET-INTEGRACION.md](./WIDGET-INTEGRACION.md).
 
 ## Datos reales y modelo elegido
 
-Se eligió **Ollama con `qwen3:4b`**, intercambiable mediante `LanguageModel`.
-La [ficha oficial](https://ollama.com/library/qwen3:4b) declara soporte de herramientas
+Se eligió **Ollama con `qwen3:4b-instruct-2507-q4_K_M`**, intercambiable mediante `LanguageModel`.
+La [ficha oficial](https://ollama.com/library/qwen3:4b-instruct-2507-q4_K_M) declara soporte de herramientas
 y un artefacto de aproximadamente 2.5 GB; la memoria de ejecución es adicional.
 La integración usa [`POST /api/chat`](https://docs.ollama.com/api/chat), sin streaming,
 y el [formato nativo de herramientas](https://docs.ollama.com/capabilities/tool-calling).
@@ -62,7 +65,7 @@ No se registra una tarjeta ni se configura un proveedor de pago.
 Preparar Ollama en el equipo y descargar el modelo:
 
 ```powershell
-ollama pull qwen3:4b
+ollama pull qwen3:4b-instruct-2507-q4_K_M
 ```
 
 Levantar Redis y el MCP siguiendo [mcp-tools.md](./mcp-tools.md). Configurar el
@@ -83,7 +86,7 @@ si se intentan combinar con `AGENT_MODE=ollama`.
 
 La configuración completa está en `apps/api/.env.example`; copiarla una vez a
 `apps/api/.env` si se prefiere usar archivo. No reemplazar archivos `.env` existentes.
-Los tiempos y la calidad de `qwen3:4b` deben medirse en el hardware del equipo.
+Los tiempos y la calidad de `qwen3:4b-instruct-2507-q4_K_M` deben medirse en el hardware del equipo.
 
 ## Contrato para José
 
@@ -252,7 +255,7 @@ pnpm eval:agent
 `eval:agent` ejecuta 31 casos deterministas: diez de uso correcto, diez de
 inyección directa, uno de límites ante inyección indirecta y diez de extracción
 de instrucciones. Verifica controles de código con dobles de LLM/MCP; no mide
-resistencia de `qwen3:4b`. La prueba indirecta fuerza una propuesta de herramienta
+resistencia de `qwen3:4b-instruct-2507-q4_K_M`. La prueba indirecta fuerza una propuesta de herramienta
 prohibida después de un resultado externo para comprobar el despachador.
 
 El dataset real tiene otros 30 casos iniciales (10 funcionales, 10 LLM01 y 10
