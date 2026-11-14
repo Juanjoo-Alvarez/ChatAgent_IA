@@ -1,5 +1,5 @@
 import type { MessageReference, TransportAction } from "@agichat/core";
-import { referenceSchema, referenceUrl, type Reference } from "@agichat/protocol";
+import { referenceSchema, referenceUrl, resolveReferenceRequest, type Reference } from "@agichat/protocol";
 
 export interface ReferenceWindow {
   opener: unknown;
@@ -17,18 +17,8 @@ export class ReferenceNavigator {
 
   public begin(text: string, known: readonly MessageReference[]): void {
     this.finish();
-    const match = /^(?:por favor[, ]+)?(?:abre|abrir|open)\s+(imdb|google\s+books)(?:\s+([\w-]+))?[.!?]?$/i.exec(text.trim());
-    if (match === null) { return; }
-    const provider = match[1]?.toLowerCase() === "imdb" ? "imdb" : "google-books";
-    const candidates = new Map<string, Reference>();
-    for (const value of known) {
-      const reference = referenceSchema.safeParse(value);
-      if (reference.success && reference.data.provider === provider && (match[2] === undefined || value.id === match[2])) {
-        candidates.set(value.id, reference.data);
-      }
-    }
-    if (candidates.size !== 1) { return; }
-    const reference = candidates.values().next().value!;
+    const { reference } = resolveReferenceRequest(text, known);
+    if (reference === null) { return; }
     const reserved = this.open();
     if (reserved === null) { throw new Error("Permite las ventanas emergentes para este sitio y vuelve a pedir abrir la referencia."); }
     this.pending = { window: reserved, reference };

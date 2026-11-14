@@ -33,7 +33,9 @@ try {
   const url = import.meta.env.VITE_CHAT_WEBSOCKET_URL
     || (import.meta.env.DEV ? "ws://127.0.0.1:8000/chat" : undefined);
   if (url === undefined) { throw new Error("Chat endpoint is not configured"); }
-  const transport = new WebSocketTransportAdapter({ url });
+  // El modelo local puede necesitar hasta 180 s; esperar el error de la API antes de cancelar.
+  const responseTimeoutMs = Number(import.meta.env.VITE_CHAT_RESPONSE_TIMEOUT_MS || 185000);
+  const transport = new WebSocketTransportAdapter({ url, responseTimeoutMs });
   widget.transport = transport;
   // Una página conservada en bfcache puede volver a mostrarse con su sesión.
   window.addEventListener("pagehide", (event) => { if (!event.persisted) { transport.dispose(); } });

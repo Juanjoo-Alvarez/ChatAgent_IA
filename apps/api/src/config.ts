@@ -36,7 +36,7 @@ export function loadApiConfig(env: Readonly<Record<string, string | undefined>>)
   if (sessionStore === "redis" && !env.REDIS_URL) { throw new Error("REDIS_URL is required"); }
   const origins = (env.CHAT_ALLOWED_ORIGINS ?? "http://localhost:5173,http://127.0.0.1:5173").split(",").map((value) => value.trim());
   if (origins.length === 0 || origins.some((origin) => { try { const url = new URL(origin); return !["http:", "https:"].includes(url.protocol) || url.origin !== origin; } catch { return true; } })) { throw new Error("Invalid CHAT_ALLOWED_ORIGINS"); }
-  const ollamaModel = env.OLLAMA_MODEL?.trim() ?? "qwen3:4b";
+  const ollamaModel = env.OLLAMA_MODEL?.trim() ?? "qwen3:4b-instruct-2507-q4_K_M";
   if (ollamaModel.length === 0 || ollamaModel.length > 100) { throw new Error("Invalid OLLAMA_MODEL"); }
   return {
     host: env.CHAT_HOST ?? "127.0.0.1", port: integer("CHAT_PORT", 8000, 65535), origins, mode, toolsMode,

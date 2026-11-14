@@ -67,6 +67,9 @@ jobs:
         env:
           REDIS_URL: redis://localhost:6379
 
+      - name: Validate Compose configuration
+        run: pnpm test:compose
+
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v7

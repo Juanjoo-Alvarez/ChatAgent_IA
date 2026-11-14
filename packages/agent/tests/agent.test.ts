@@ -73,11 +73,11 @@ describe("MovieAgent", () => {
     await expect(new MovieAgent(f.model, f.gateway).respond({ content: "Hola", history: [], signal: controller.signal })).rejects.toBeDefined();
     expect(f.gateway.open).not.toHaveBeenCalled();
   });
-  it("opens a known reference requested in ordinary chat and clarifies unknown targets", async () => {
+  it.each(["Abre IMDb", "¿Puedes abrir IMDb?"])("opens a known reference for %s and clarifies unknown targets", async (content) => {
     const f = fixtures();
     const agent = new MovieAgent(f.model, f.gateway);
     const reference = { provider: "imdb" as const, id: "tt9950101" };
-    const result = await agent.respond({ content: "Abre IMDb", history: [{ user: "Una película", assistant: "Marea alta", references: [reference] }], signal: signal() });
+    const result = await agent.respond({ content, history: [{ user: "Una película", assistant: "Marea alta", references: [reference] }], signal: signal() });
     expect(result.actions).toEqual([{ type: "open-reference", reference }]);
     const unclear = await agent.respond({ content: "Abre Google Books", history: [], signal: signal() });
     expect(unclear.actions).toEqual([]);

@@ -6,7 +6,10 @@ import { cleanupWidgets, mountClient, send, text, widgetServer } from "./harness
 afterEach(cleanupWidgets);
 
 describe("Public widget connected to HTTP/WebSocket API", () => {
-  it("recommends, renders a poster, keeps comparison context and opens both references", async () => {
+  it.each([
+    ["Abre IMDb", "Abre Google Books"],
+    ["¿Puedes abrir IMDb?", "¿Podrías abrir Google Books?"]
+  ])("recommends, compares and opens references for %s", async (imdbRequest, booksRequest) => {
     const agent = journeyAgent();
     const api = await widgetServer(agent);
     const { host } = await mountClient(api.base);
@@ -23,9 +26,9 @@ describe("Public widget connected to HTTP/WebSocket API", () => {
     await send(host, "Compárala con el libro");
     await text(host, "Comparación de prueba");
     expect(agent.respond).toHaveBeenLastCalledWith(expect.objectContaining({ history: [expect.objectContaining({ user: "Recomienda una película" })] }));
-    await send(host, "Abre IMDb");
+    await send(host, imdbRequest);
     await vi.waitFor(() => expect(popups[0]!.location.replace).toHaveBeenCalledWith("https://www.imdb.com/title/tt1234567/"));
-    await send(host, "Abre Google Books");
+    await send(host, booksRequest);
     await vi.waitFor(() => expect(popups[1]!.location.replace).toHaveBeenCalledWith("https://books.google.com/books?id=volume_1"));
     expect(open).toHaveBeenCalledTimes(2);
     expect(popups.every((popup) => popup.opener === null)).toBe(true);

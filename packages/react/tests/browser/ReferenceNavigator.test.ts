@@ -18,7 +18,13 @@ describe("ReferenceNavigator", () => {
     navigator.accept(action());
     expect(open).not.toHaveBeenCalled();
   });
-  it.each([["Abre IMDb", imdb, "https://www.imdb.com/title/tt1234567/"], ["Por favor, abre Google Books", book, "https://books.google.com/books?id=volume_1"]] as const)("opens only the expected destination for %s", (text, reference, url) => {
+  it.each([
+    ["Abre IMDb", imdb, "https://www.imdb.com/title/tt1234567/"],
+    ["Por favor, abre Google Books", book, "https://books.google.com/books?id=volume_1"],
+    ["¿Puedes abrir IMDb?", imdb, "https://www.imdb.com/title/tt1234567/"],
+    ["¿Podrías abrir Google Books?", book, "https://books.google.com/books?id=volume_1"],
+    ["Can you open IMDb?", imdb, "https://www.imdb.com/title/tt1234567/"]
+  ] as const)("opens only the expected destination for %s", (text, reference, url) => {
     const { navigator, popup, open } = harness();
     navigator.begin(text, [reference, reference]);
     expect(open).toHaveBeenCalledOnce();

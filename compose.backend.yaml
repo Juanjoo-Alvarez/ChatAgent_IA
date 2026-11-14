@@ -11,7 +11,7 @@ x-api: &api
     TOOLS_MODE: mcp
     MCP_URL: http://mcp:8001/mcp
     OLLAMA_URL: http://host.docker.internal:11434
-    OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+    OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
     SESSION_STORE: redis
     REDIS_URL: redis://redis:6379
   extra_hosts:
@@ -35,6 +35,10 @@ services:
       MCP_ALLOWED_HOSTS: mcp:8001,127.0.0.1:8001,localhost:8001
       TMDB_READ_ACCESS_TOKEN: ${TMDB_READ_ACCESS_TOKEN:?Define TMDB_READ_ACCESS_TOKEN}
       QUOTA_TMDB: ${QUOTA_TMDB:?Define QUOTA_TMDB}
+      GOOGLE_BOOKS_ENABLED: "${GOOGLE_BOOKS_ENABLED:-false}"
+      GOOGLE_BOOKS_API_KEY: "${GOOGLE_BOOKS_API_KEY:-}"
+      GOOGLE_BOOKS_TIMEOUT_MS: "${GOOGLE_BOOKS_TIMEOUT_MS:-8000}"
+      QUOTA_GOOGLE_BOOKS: "${QUOTA_GOOGLE_BOOKS:-}"
       SHARED_STORE: redis
       REDIS_URL: redis://redis:6379
     ports:
