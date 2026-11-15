@@ -186,7 +186,16 @@ El equipo utiliza GitHub Flow:
 
 No se permiten pushes directos a `main`. Consulta [AGENTS.md](./AGENTS.md) para las convenciones completas y [docs/RELEASING.md](./docs/RELEASING.md) para el proceso de distribución.
 
+Para una explicación introductoria de integración continua, entrega continua,
+despliegue continuo y control de versiones, consulta
+[Integración, entrega, despliegue continuo y SVN](./docs/CI-CD-Y-SVN.md).
+
 ## Proyecto 2
+
+Consulta el [reparto de tareas y plan inicial de integración](./docs/PROYECTO-2-PLAN.md)
+para las responsabilidades de los cinco integrantes, los entregables, la
+arquitectura propuesta y los criterios de aceptación del producto de películas.
+El plan conserva el contexto del 27 de octubre; no representa el estado actual de avance.
 
 La [guía del backend del agente](./docs/BACKEND-AGENTE.md) explica el arranque
 local, el protocolo WebSocket para José, la extensión MCP para Daniel, las
