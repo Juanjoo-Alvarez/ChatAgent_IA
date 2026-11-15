@@ -2,7 +2,8 @@
 
 Cada escenario se ejecuta de extremo a extremo: un cliente MCP real se conecta
 por Streamable HTTP al servidor, que consulta un TMDB simulado. No hay llamadas
-reales a TMDB ni credenciales.
+reales a TMDB ni credenciales. La evidencia con la API real y la configuración
+de la cuenta están en [TMDB-EVIDENCIA.md](./TMDB-EVIDENCIA.md).
 
 - Datos: [`apps/mcp-server/tests/evaluation/dataset.ts`](../apps/mcp-server/tests/evaluation/dataset.ts)
 - Pruebas: [`apps/mcp-server/tests/evaluation/evaluation.test.ts`](../apps/mcp-server/tests/evaluation/evaluation.test.ts)
