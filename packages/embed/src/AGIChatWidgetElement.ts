@@ -20,13 +20,16 @@ const hostStyles = `
   [data-agichat-root] {
     width: 100%;
   }
+
+  :host([layout="full"]) { max-width: none; height: 100%; }
+  :host([layout="full"]) [data-agichat-root] { height: 100%; }
 `;
 
 /** Web Component que encapsula el widget y lo expone a sitios sin React. */
 export class AGIChatWidgetElement extends HTMLElement {
   public static get observedAttributes(): string[] {
     // El navegador invoca attributeChangedCallback solo para esta lista.
-    return ["title", "session-id", "placeholder", "empty-state-message", "websocket-url", "tmdb-credits"];
+    return ["title", "session-id", "placeholder", "welcome-title", "empty-state-message", "layout", "websocket-url", "tmdb-credits"];
   }
 
   private readonly mountTarget: HTMLDivElement;
@@ -34,6 +37,7 @@ export class AGIChatWidgetElement extends HTMLElement {
   private injectedTransport: AGIChatTransport | undefined;
   private ownedTransport: MockTransportAdapter | WebSocketTransportAdapter | undefined;
   private themeOverride: AGIChatWidgetTheme | undefined;
+  private welcomeSuggestions: NonNullable<ChatWidgetProps["suggestions"]> = [];
 
   public constructor() {
     super();
@@ -88,6 +92,15 @@ export class AGIChatWidgetElement extends HTMLElement {
     this.renderWidget();
   }
 
+  public get suggestions(): NonNullable<ChatWidgetProps["suggestions"]> {
+    return this.welcomeSuggestions;
+  }
+
+  public set suggestions(value: NonNullable<ChatWidgetProps["suggestions"]>) {
+    this.welcomeSuggestions = value;
+    if (this.isConnected) { this.renderWidget(); }
+  }
+
   public disconnectedCallback(): void {
     // Solo se elimina el transporte creado por el componente; uno inyectado
     // sigue perteneciendo al consumidor y puede reutilizarse en otro widget.
@@ -121,16 +134,20 @@ export class AGIChatWidgetElement extends HTMLElement {
     const sessionId = this.getAttribute("session-id");
     const placeholder = this.getAttribute("placeholder");
     const emptyStateMessage = this.getAttribute("empty-state-message");
+    const welcomeTitle = this.getAttribute("welcome-title");
 
     const props: ChatWidgetProps = {
       transport: this.transport,
       showTmdbCredits: this.hasAttribute("tmdb-credits"),
+      suggestions: this.welcomeSuggestions,
+      layout: this.getAttribute("layout") === "full" ? "full" : "widget",
       ...(title !== null ? { title } : {}),
       ...(sessionId !== null && sessionId.trim().length > 0
         ? { sessionId }
         : {}),
       ...(placeholder !== null ? { placeholder } : {}),
       ...(emptyStateMessage !== null ? { emptyStateMessage } : {}),
+      ...(welcomeTitle !== null ? { welcomeTitle } : {}),
       ...(this.themeOverride !== undefined ? { theme: this.themeOverride } : {})
     };
     if (!updateChatWidget(this.mountTarget, props)) {

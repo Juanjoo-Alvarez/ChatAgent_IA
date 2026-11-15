@@ -16,7 +16,7 @@ export {
   type ChatWidgetTarget,
   type UnmountChatWidget
 } from "./mountChatWidget";
-export type { ChatWidgetProps } from "@agichat/react";
+export type { ChatWidgetProps, ChatSuggestion } from "@agichat/react";
 export {
   WebSocketTransportAdapter,
   WebSocketTransportError,
