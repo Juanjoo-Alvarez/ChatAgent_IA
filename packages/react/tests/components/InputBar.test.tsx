@@ -1,10 +1,37 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { InputBar } from "../../src/components/InputBar/InputBar";
 
 describe("InputBar", () => {
+  it("keeps an IME composition Enter from submitting unfinished text", () => {
+    const onSend = vi.fn();
+    render(<InputBar onSend={onSend} />);
+    const textbox = screen.getByRole("textbox", { name: "Mensaje" });
+    fireEvent.change(textbox, { target: { value: "Película" } });
+    fireEvent.keyDown(textbox, { key: "Enter", isComposing: true });
+    expect(onSend).not.toHaveBeenCalled();
+    expect(textbox).toHaveValue("Película");
+    fireEvent.keyDown(textbox, { key: "Enter", isComposing: false });
+    expect(onSend).toHaveBeenCalledWith("Película");
+  });
+
+  it("edits a controlled draft and reports its clear after submitting", async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const onSend = vi.fn();
+    const { rerender } = render(<InputBar onSend={onSend} value="Un libro" onValueChange={onValueChange} />);
+    const textbox = screen.getByRole("textbox", { name: "Mensaje" });
+    await user.type(textbox, "s");
+    expect(onValueChange).toHaveBeenLastCalledWith("Un libros");
+    rerender(<InputBar onSend={onSend} value="Una película" onValueChange={onValueChange} />);
+    expect(textbox).toHaveValue("Una película");
+    await user.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(onSend).toHaveBeenCalledWith("Una película");
+    expect(onValueChange).toHaveBeenLastCalledWith("");
+  });
+
   it("lets the user type into the input", async () => {
     const user = userEvent.setup();
     render(<InputBar onSend={vi.fn()} />);
@@ -96,17 +123,26 @@ describe("InputBar", () => {
     expect(button.closest("form")).toHaveStyle({ backgroundColor: "#f0fdfa" });
   });
 
-  it("shows the focus ring only while the message field is focused", async () => {
+  it("highlights the whole composer without drawing a second field inside it", async () => {
     const user = userEvent.setup();
     render(<InputBar onSend={vi.fn()} theme={{ focusRing: "rgb(1, 2, 3)" }} />);
 
     const textbox = screen.getByRole("textbox", { name: "Mensaje" });
+    const composer = textbox.closest("form");
+    expect(composer).toHaveStyle({ boxShadow: "none" });
     expect(textbox).toHaveStyle({ boxShadow: "none" });
 
     await user.click(textbox);
-    expect(textbox).toHaveStyle({ boxShadow: "0 0 0 3px rgb(1, 2, 3)" });
+    expect(composer).toHaveStyle({ boxShadow: "0 0 0 3px rgb(1, 2, 3)" });
+    expect(textbox).toHaveStyle({ boxShadow: "none", borderWidth: "0px" });
+
+    await user.type(textbox, "Hola");
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Enviar" })).toHaveFocus();
+    expect(composer).toHaveStyle({ boxShadow: "0 0 0 3px rgb(1, 2, 3)" });
 
     await user.tab();
+    expect(composer).toHaveStyle({ boxShadow: "none" });
     expect(textbox).toHaveStyle({ boxShadow: "none" });
   });
 });

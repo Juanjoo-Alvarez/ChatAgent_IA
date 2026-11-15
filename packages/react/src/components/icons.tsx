@@ -5,22 +5,23 @@ export const AgentIcon = (): ReactElement => (
   <svg
     aria-hidden="true"
     focusable="false"
-    viewBox="0 0 24 24"
-    width="20"
-    height="20"
+    viewBox="0 0 64 64"
+    width="100%"
+    height="100%"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.8"
+    strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
   >
-    <path d="M12 3v3" />
-    <circle cx="12" cy="2.5" r="1" fill="currentColor" stroke="none" />
-    <rect x="4" y="6" width="16" height="13" rx="4" />
-    <path d="M8 19v2M16 19v2M1.5 11v4M22.5 11v4" />
-    <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
-    <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
-    <path d="M9 15.5h6" />
+    <circle cx="17" cy="19" r="9" fill="currentColor" stroke="none" />
+    <circle cx="47" cy="19" r="9" fill="currentColor" stroke="none" />
+    <path d="M12 31c0-12 8-19 20-19s20 7 20 19v8c0 12-8 19-20 19S12 51 12 39Z" fill="currentColor" stroke="none" />
+    <ellipse cx="32" cy="42" rx="11" ry="9" fill="var(--agichat-avatar-ground, #e6efea)" stroke="none" />
+    <circle cx="24" cy="30" r="2.3" fill="var(--agichat-avatar-ground, #e6efea)" stroke="none" />
+    <circle cx="40" cy="30" r="2.3" fill="var(--agichat-avatar-ground, #e6efea)" stroke="none" />
+    <path d="M28 39h8l-4 5Z" fill="currentColor" stroke="none" />
+    <path d="M32 43v4" />
   </svg>
 );
 
@@ -38,7 +39,6 @@ export const SendIcon = (): ReactElement => (
     strokeLinecap="round"
     strokeLinejoin="round"
   >
-    <path d="m22 2-7 20-4-9-9-4Z" />
-    <path d="M22 2 11 13" />
+    <path d="M5 12h14m-6-6 6 6-6 6" />
   </svg>
 );
