@@ -54,7 +54,7 @@ export interface MessageBubbleProps {
 
 const rowStyle = (isUser: boolean): CSSProperties => ({
   display: "flex",
-  alignItems: "flex-end",
+  alignItems: "flex-start",
   gap: 8,
   justifyContent: isUser ? "flex-end" : "flex-start",
   padding: "2px 0"
@@ -66,7 +66,8 @@ const avatarStyle = (theme: AGIChatTheme): CSSProperties => ({
   flex: "0 0 auto",
   width: 30,
   height: 30,
-  borderRadius: theme.controlRadius - 3,
+  borderRadius: "50%",
+  padding: 5,
   color: theme.agentAvatarText,
   backgroundColor: theme.agentAvatarBackground
 });
@@ -75,28 +76,27 @@ const bubbleStyle = (
   theme: AGIChatTheme,
   isUser: boolean
 ): CSSProperties => ({
-  maxWidth: "78%",
+  maxWidth: "88%",
+  minWidth: 0,
   borderRadius: isUser
     ? `${theme.bubbleRadius}px ${theme.bubbleRadius}px 4px ${theme.bubbleRadius}px`
     : `${theme.bubbleRadius}px ${theme.bubbleRadius}px ${theme.bubbleRadius}px 4px`,
   padding: "10px 13px",
   fontSize: theme.fontSize,
   lineHeight: 1.5,
-  whiteSpace: "pre-wrap",
+  whiteSpace: isUser ? "pre-wrap" : "normal",
   wordBreak: "break-word",
   backgroundColor: isUser
     ? theme.userBubbleBackground
     : theme.agentBubbleBackground,
   color: isUser ? theme.userBubbleText : theme.agentBubbleText,
-  boxShadow: isUser
-    ? `0 6px 16px ${theme.focusRing}`
-    : "0 3px 14px rgba(15, 23, 42, 0.07)"
+  boxShadow: "none"
 });
 
 const statusStyle = (theme: AGIChatTheme): CSSProperties => ({
   display: "block",
   marginTop: 4,
-  fontSize: theme.smallFontSize - 1
+  fontSize: theme.smallFontSize
 });
 
 export const MessageBubble = ({
@@ -145,7 +145,7 @@ export const MessageBubble = ({
         {message.status === "sending" && (
           <span
             className="agichat-message__status"
-            style={{ ...statusStyle(theme), color: theme.headerMutedText }}
+            style={{ ...statusStyle(theme), color: theme.mutedText }}
           >
             Enviando…
           </span>

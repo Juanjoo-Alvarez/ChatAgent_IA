@@ -1,4 +1,4 @@
-import { AGICHAT_WIDGET_TAG, WebSocketTransportAdapter, type AGIChatWidgetElement } from "@agichat/embed";
+﻿import { mountChatWidget, WebSocketTransportAdapter, type UnmountChatWidget } from "@agichat/embed";
 import { moviePrompts } from "./moviePrompts";
 import "./styles.css";
 
@@ -8,38 +8,55 @@ function required<T extends Element>(selector: string): T {
   return element;
 }
 
-const widget = required<AGIChatWidgetElement>(AGICHAT_WIDGET_TAG);
-const status = required<HTMLElement>("[data-copy-status]");
-const prompts = required<HTMLElement>("[data-prompt-list]");
+const root = required<HTMLElement>("[data-chat-root]");
 const failure = required<HTMLElement>("[data-configuration-error]");
+const restart = required<HTMLButtonElement>("[data-new-conversation]");
+const dialog = required<HTMLDialogElement>("[data-help-dialog]");
+let transport: WebSocketTransportAdapter | undefined;
+let unmount: UnmountChatWidget | undefined;
 
-async function copyPrompt(prompt: string): Promise<void> {
+function startConversation(): void {
+  unmount?.();
+  transport?.dispose();
+  unmount = undefined;
+  transport = undefined;
   try {
-    await navigator.clipboard.writeText(prompt);
-    status.textContent = "Mensaje copiado. Pégalo en el chat para enviarlo.";
-  } catch { status.textContent = `Escribe en el chat: ${prompt}`; }
+    const url = import.meta.env.VITE_CHAT_WEBSOCKET_URL
+      || (import.meta.env.DEV ? "ws://127.0.0.1:8000/chat" : undefined);
+    if (url === undefined) { throw new Error("Chat endpoint is not configured"); }
+    // Esperar el error de la API: el modelo local puede necesitar hasta 180 s.
+    const responseTimeoutMs = Number(import.meta.env.VITE_CHAT_RESPONSE_TIMEOUT_MS || 185000);
+    transport = new WebSocketTransportAdapter({ url, responseTimeoutMs });
+    unmount = mountChatWidget(root, {
+      transport,
+      layout: "full",
+      title: "Hablemos de cine",
+      welcomeTitle: "¿Qué vemos hoy?",
+      emptyStateMessage: "Soy Sofía, tu compañera de cine. Puedo recomendarte películas y compararlas con sus libros para decidir si vale la pena verlas.",
+      placeholder: "¿Qué película tienes en mente?",
+      suggestions: moviePrompts,
+      theme: { fontFamily: '"Instrument Sans", system-ui, sans-serif', fontSize: 16 }
+    });
+    root.hidden = false;
+    failure.hidden = true;
+  } catch {
+    transport?.dispose();
+    root.hidden = true;
+    failure.hidden = false;
+  }
 }
 
-for (const prompt of moviePrompts) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "prompt-button";
-  button.textContent = prompt;
-  button.addEventListener("click", () => { void copyPrompt(prompt); });
-  prompts.append(button);
-}
+restart.addEventListener("click", () => {
+  startConversation();
+  // React monta la nueva raíz de forma asíncrona; el marco ya está disponible.
+  required<HTMLElement>("#conversation").focus();
+});
+required<HTMLButtonElement>("[data-reload]").addEventListener("click", startConversation);
+required<HTMLButtonElement>("[data-open-help]").addEventListener("click", () => dialog.showModal());
+dialog.addEventListener("click", (event) => { if (event.target === dialog) { dialog.close(); } });
 
-try {
-  const url = import.meta.env.VITE_CHAT_WEBSOCKET_URL
-    || (import.meta.env.DEV ? "ws://127.0.0.1:8000/chat" : undefined);
-  if (url === undefined) { throw new Error("Chat endpoint is not configured"); }
-  // El modelo local puede necesitar hasta 180 s; esperar el error de la API antes de cancelar.
-  const responseTimeoutMs = Number(import.meta.env.VITE_CHAT_RESPONSE_TIMEOUT_MS || 185000);
-  const transport = new WebSocketTransportAdapter({ url, responseTimeoutMs });
-  widget.transport = transport;
-  // Una página conservada en bfcache puede volver a mostrarse con su sesión.
-  window.addEventListener("pagehide", (event) => { if (!event.persisted) { transport.dispose(); } });
-} catch {
-  widget.remove();
-  failure.hidden = false;
-}
+// Una página conservada en bfcache puede volver a mostrarse con su sesión.
+window.addEventListener("pagehide", (event) => {
+  if (!event.persisted) { unmount?.(); transport?.dispose(); }
+});
+startConversation();

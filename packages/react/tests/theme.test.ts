@@ -12,7 +12,7 @@ describe("theme", () => {
 
     expect(resolved.accent).toBe("#0f766e");
     expect(resolved.widgetBackground).toBe(defaultTheme.widgetBackground);
-    expect(defaultTheme.accent).toBe("#4f46e5");
+    expect(defaultTheme.accent).toBe("#1b6e66");
     expect(Object.isFrozen(resolved)).toBe(true);
   });
 });

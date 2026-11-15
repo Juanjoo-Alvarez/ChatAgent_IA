@@ -31,7 +31,7 @@ describe("ChatWidget", () => {
 
     expect(screen.getByText("Soporte AGIChat")).toBeInTheDocument();
     expect(screen.getByTestId("header-avatar").querySelector("svg")).not.toBeNull();
-    expect(screen.getByText("Asistente virtual · En línea")).toBeInTheDocument();
+    expect(screen.getByText("Listo para conversar")).toBeInTheDocument();
   });
 
   it("applies theme overrides while preserving default tokens", () => {

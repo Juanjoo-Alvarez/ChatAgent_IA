@@ -1,5 +1,5 @@
 // Punto de entrada del paquete React: componentes, hook, mock y tema público.
-export { ChatWidget, type ChatWidgetProps } from "./components/ChatWidget/ChatWidget";
+export { ChatWidget, type ChatWidgetProps, type ChatSuggestion } from "./components/ChatWidget/ChatWidget";
 export { MessageBubble, type MessageBubbleProps } from "./components/MessageBubble/MessageBubble";
 export { InputBar, type InputBarProps } from "./components/InputBar/InputBar";
 export { useChat, type UseChatOptions, type UseChatResult } from "./hooks/useChat";
