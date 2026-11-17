@@ -69,6 +69,17 @@ describe("book MCP integration", () => {
     expect(loadConfig({ ...env, QUOTA_GOOGLE_BOOKS: "3/1s" }).quotaPolicies).toHaveProperty("google-books");
     expect(() => loadConfig({ ...env, QUOTA_GOOGLE_BOOKS: "3/1s", GOOGLE_BOOKS_TIMEOUT_MS: "0" })).toThrow("GOOGLE_BOOKS_TIMEOUT_MS");
   });
+  it.each(["rate_limited", "quota_exhausted", "quota_unavailable", "invalid_credentials"] as const)("exposes controlled %s errors to independent MCP clients", async (code) => {
+    const client = await connect({ ...books,
+      getBookDetails: async () => { throw new BooksError(code, code !== "invalid_credentials"); }
+    });
+    const result = await client.callTool({ name: "get_book_details", arguments: { book_id: "dune" } });
+    expect(result.isError).toBe(true);
+    expect(result.content).toEqual([{ type: "text", text: JSON.stringify({ error: {
+      code, message: "No se pudo completar la consulta de Google Books.",
+      retryable: code !== "invalid_credentials", retry_after_ms: null, details: null
+    } }) }]);
+  });
   it("serves books through the real Streamable HTTP application", async () => {
     const config = loadConfig({ TMDB_READ_ACCESS_TOKEN: "test", QUOTA_TMDB: "10/1s", SHARED_STORE: "memory", GOOGLE_BOOKS_ENABLED: "true", QUOTA_GOOGLE_BOOKS: "5/1s" });
     const tmdb = fakeTmdb({ "/movie/438631": () => json({ id: 438631, title: "Dune", original_title: "Dune", release_date: "2021-10-22", genres: [], external_ids: { imdb_id: "tt1160419" } }) });

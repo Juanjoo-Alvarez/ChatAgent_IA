@@ -1,0 +1,170 @@
+{
+  "generated_at": "2026-11-17T23:35:57.083Z",
+  "complete": true,
+  "scope": "Daniel: Google Books y comparación real Dune (2021) / Frank Herbert",
+  "method": "Clientes de producción con HTTP real; sin fixtures ni LLM. No acredita el recorrido del agente o del widget.",
+  "credentials_configured": {
+    "google_books": true,
+    "tmdb": true
+  },
+  "checks": [
+    {
+      "name": "google_books_search",
+      "status": "passed",
+      "duration_ms": 808
+    },
+    {
+      "name": "google_books_details",
+      "status": "passed",
+      "duration_ms": 161
+    },
+    {
+      "name": "tmdb_dune_2021",
+      "status": "passed",
+      "duration_ms": 323
+    },
+    {
+      "name": "real_comparison",
+      "status": "passed",
+      "duration_ms": 4
+    },
+    {
+      "name": "cached_book_details",
+      "status": "passed",
+      "duration_ms": 0
+    },
+    {
+      "name": "independent_mcp_client",
+      "status": "passed",
+      "duration_ms": 122
+    }
+  ],
+  "requests": [
+    {
+      "provider": "google-books",
+      "status": 200,
+      "duration_ms": 792
+    },
+    {
+      "provider": "google-books",
+      "status": 200,
+      "duration_ms": 159
+    },
+    {
+      "provider": "tmdb",
+      "status": 200,
+      "duration_ms": 320
+    }
+  ],
+  "search_candidates": [
+    {
+      "id": "tJzgQQAACAAJ",
+      "title": "Dune",
+      "authors": [
+        "Frank Herbert",
+        "Domingo Santos"
+      ]
+    },
+    {
+      "id": "hmgbPQAACAAJ",
+      "title": "Dune. Frank Herbert",
+      "authors": [
+        "Frank Herbert"
+      ]
+    },
+    {
+      "id": "lG-REAAAQBAJ",
+      "title": "ESTUCHE LAS CRNICAS DE DUNE/ FRANK HERBERT'S DUNE SAGA",
+      "authors": [
+        "Frank Herbert"
+      ]
+    },
+    {
+      "id": "OO5UzwEACAAJ",
+      "title": "Saga Dune 1-6. La mayor epopeya de todos los tiempos",
+      "authors": [
+        "Frank Herbert"
+      ]
+    },
+    {
+      "id": "deRpPwAACAAJ",
+      "title": "Dune",
+      "authors": [
+        "Frank Herbert"
+      ]
+    }
+  ],
+  "book": {
+    "id": "q_5WzQEACAAJ",
+    "title": "Dune (Movie Tie-In).",
+    "authors": [
+      "Frank Herbert"
+    ],
+    "published_date": "1965",
+    "reference": {
+      "provider": "google-books",
+      "id": "q_5WzQEACAAJ"
+    },
+    "url": "https://books.google.com/books?id=q_5WzQEACAAJ",
+    "has_description": true
+  },
+  "movie": {
+    "id": 438631,
+    "title": "Duna",
+    "year": 2021,
+    "reference": {
+      "kind": "imdb",
+      "id": "tt1160419",
+      "url": "https://www.imdb.com/title/tt1160419/"
+    }
+  },
+  "comparison": {
+    "status": "adaptation_identified",
+    "reasons": [
+      "La fuente del productor identifica la novela y su autor; coinciden la película, el año, el título bibliográfico y el autor."
+    ],
+    "similarities": [
+      {
+        "text": "Ambas obras siguen a Paul Atreides y el conflicto en el planeta desértico Arrakis.",
+        "sources": [
+          "https://www.legendary.com/legendary-comics-announces-the-official-graphic-novel-adaptation-of-denis-villeneuves-epic-film-dune/",
+          "https://www.legendary.com/legendary-entertainment-acquires-rights-to-frank-herberts-classic-sci-fi-novel-dune/"
+        ]
+      }
+    ],
+    "differences": [
+      {
+        "text": "La adaptación de 2021 divide la novela en varias películas, por lo que esta entrega no abarca toda la obra. Las notas de producción documentan esa decisión de estructura.",
+        "sources": [
+          "https://bfidatadigipres.github.io/previews/2021/10/05/dune/"
+        ]
+      }
+    ],
+    "recommendation": {
+      "verdict": "consider",
+      "reasons": [
+        "Puedes considerar verla como interpretación cinematográfica de la obra identificada."
+      ]
+    },
+    "limitations": [
+      "La fecha de Google Books corresponde a la edición recuperada, no necesariamente a la publicación original.",
+      "No se ha verificado fidelidad escena por escena ni capítulo por capítulo.",
+      "El catálogo de asociaciones verificadas es limitado: ausencia de evidencia no significa ausencia de adaptación."
+    ],
+    "sources": [
+      "https://books.google.com/books?id=q_5WzQEACAAJ",
+      "https://www.themoviedb.org/movie/438631",
+      "https://www.legendary.com/legendary-comics-announces-the-official-graphic-novel-adaptation-of-denis-villeneuves-epic-film-dune/",
+      "https://www.legendary.com/legendary-entertainment-acquires-rights-to-frank-herberts-classic-sci-fi-novel-dune/",
+      "https://www.penguinrandomhouse.com/books/352036/dune-movie-tie-in-by-frank-herbert/9780143111580/",
+      "https://bfidatadigipres.github.io/previews/2021/10/05/dune/"
+    ],
+    "references": [
+      {
+        "provider": "google-books",
+        "id": "q_5WzQEACAAJ"
+      }
+    ]
+  },
+  "review_required": "Revisar las fuentes y el contenido antes de declarar terminada la entrega. Un reporte bloqueado no acredita la comparación."
+}
