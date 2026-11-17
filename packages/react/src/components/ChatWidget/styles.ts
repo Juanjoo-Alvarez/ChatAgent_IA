@@ -59,7 +59,7 @@ export const widgetCss = `
   width: 100%; max-width: 800px; margin: 0 auto; padding: 24px 20px;
 }
 .agichat-widget__messages--empty { display: flex; flex-direction: column; }
-.agichat-widget__credits { width: 100%; max-width: 800px; margin: 0 auto; padding: 0 20px 16px; }
+.agichat-widget__credits { flex: 0 0 auto; width: 100%; max-width: 800px; margin: 0 auto; padding: 0 20px max(12px, env(safe-area-inset-bottom)); }
 .agichat-widget__messages:focus-visible { outline: 2px solid var(--agichat-accent); outline-offset: -3px; }
 .agichat-welcome {
   width: 100%; max-width: 680px; margin: auto; padding: 28px 20px;

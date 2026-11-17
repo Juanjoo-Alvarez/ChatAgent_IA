@@ -36,8 +36,12 @@ describe("Movie recommendations", () => {
   });
   it("includes the official notice and an incorporated logo in credits", () => {
     render(<TmdbCredits />);
-    expect(screen.getByLabelText("Créditos de TMDB")).toHaveTextContent("This product uses the TMDB API but is not endorsed or certified by TMDB.");
+    const notice = screen.getByText("This product uses the TMDB API but is not endorsed or certified by TMDB.", { exact: true });
+    expect(notice).toBeVisible();
+    expect(notice).toHaveAttribute("lang", "en");
+    expect(screen.getByLabelText("Créditos de TMDB")).toContainElement(notice);
     expect(screen.getByRole("link")).toHaveAttribute("href", "https://www.themoviedb.org");
+    expect(screen.getByRole("link")).toHaveAttribute("rel", "noopener noreferrer");
     expect(screen.getByAltText("The Movie Database (TMDB)")).toHaveAttribute("src", expect.stringContaining("data:image/svg+xml;base64,"));
   });
 });
