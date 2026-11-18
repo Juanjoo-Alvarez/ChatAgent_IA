@@ -1,92 +1,51 @@
 # Arquitectura de alto nivel
 
-Este documento describe los componentes de AGIChat, cómo se comunican y por qué
-la arquitectura puede escalar. Los detalles internos del agente están en
-[AGENTE.md](./AGENTE.md) y las mediciones en [ESCALABILIDAD.md](./ESCALABILIDAD.md).
-
-Revisado contra el código del commit `ccd40d9`.
+La vista de contexto muestra los componentes de AGIChat y cómo se comunican.
+El flujo interno está en [Organización del agente](./AGENTE.md).
 
 ## Diagrama de contexto
 
 ```mermaid
 flowchart LR
-    U(["Usuario"])
-
-    subgraph Cliente["Cliente (navegador)"]
-        direction TB
-        SITE["Sitio cliente"]
-        EMB["@agichat/embed: Web Component o mountChatWidget"]
-        RCT["@agichat/react: widget y useChat"]
-        CORE["@agichat/core: ChatEngine"]
-        WST["@agichat/transport-websocket"]
-        SITE --> EMB --> RCT --> CORE --> WST
-    end
-
-    subgraph Backend["Backend"]
-        direction TB
-        PX["Proxy nginx :8080"]
-        API1["API réplica A :8000"]
-        API2["API réplica B :8002"]
-        AG["MovieAgent"]
-        OLL["Ollama :11434 o Groq"]
-        MCP["Servidor MCP :8001"]
-        PX --> API1
-        PX --> API2
-        API1 --> AG
-        API2 --> AG
-        AG --> OLL
-        AG -- "MCP Streamable HTTP" --> MCP
-    end
-
-    subgraph Datos["Datos compartidos"]
-        R1[("Redis: sesiones y leases")]
-        R2[("Redis: caché y cuotas")]
-    end
-
-    subgraph Externos["Proveedores externos"]
-        TMDB["TMDB API"]
-        GB["Google Books API"]
-        WD["Wikidata"]
-        IMDB["IMDb"]
-        GBW["Google Books web"]
-    end
-
-    U --> SITE
-    WST -- "POST /sessions y WSS /chat" --> PX
-    API1 --> R1
-    API2 --> R1
-    MCP --> R2
-    MCP --> TMDB
-    MCP --> GB
-    MCP --> WD
-    RCT -. "abre pestaña validada" .-> IMDB
-    RCT -. "abre pestaña validada" .-> GBW
+    U(["Usuario"]) --> W["Widget del Proyecto 1"]
+    W <--> A["API de chat con MovieAgent"]
+    A --> L["Modelo de lenguaje"]
+    A --> M["Servidor MCP"]
+    A --> R[("Redis compartido")]
+    M --> R
+    M --> F["Fuentes de datos externas"]
 ```
 
-Notas sobre el diagrama:
+El modelo de lenguaje puede ser Ollama o Groq. El servidor MCP consulta TMDB
+para películas y usa Google Books y Wikidata cuando necesita datos de libros
+y adaptaciones.
 
-- `MovieAgent` no es un servicio aparte. Es una clase de `packages/agent` que
-  se ejecuta dentro de cada réplica de la API.
-- El proxy y la segunda réplica solo existen con el perfil `scale` de Compose.
-  En el arranque manual la API escucha directamente en el puerto 8000.
-- En local la conexión es `ws://`, sin TLS. `wss://` es un requisito de un
-  despliegue público, que no existe (ver [DESPLIEGUE.md](../manuales/DESPLIEGUE.md)).
-- Las dos cajas de Redis son la misma instancia, con prefijos de clave distintos.
-- El modelo puede ser Ollama local (`AGENT_MODE=ollama`, valor predeterminado) o
-  Groq alojado (`AGENT_MODE=groq`). Con Groq, la API llama a un servicio externo y
-  Ollama deja de ser necesario. Las herramientas se ejecutan siempre en el
-  servidor MCP propio.
-- Para comparar películas con libros, el MCP también consulta Wikidata.
+## Por qué escala
+
+Con Redis, las réplicas de la API comparten las sesiones y el bloqueo temporal
+de cada turno. Una conexión WebSocket permanece en la réplica que la aceptó y
+una reconexión puede recuperar la sesión en otra. El servidor MCP atiende
+solicitudes independientes y puede replicarse usando la misma caché y los
+mismos contadores de cuota en Redis.
+
+Las pruebas locales con dos réplicas de la API verificaron la continuidad de
+sesión y la ejecución de un solo turno por sesión a la vez. La capacidad del
+modelo y las cuotas de los proveedores siguen limitando el rendimiento.
+[Mediciones y límites de escalabilidad](./ESCALABILIDAD.md).
 
 ## Diagrama de despliegue local
 
-Servicios definidos en `compose.yaml` y `compose.backend.yaml`. Ollama y la demo
-se ejecutan en el equipo anfitrión. Todos los puertos se publican solo en
-`127.0.0.1`.
+La vista técnica muestra la demo y Ollama en el equipo anfitrión, y los servicios
+definidos en `compose.yaml` y `compose.backend.yaml`. El perfil `scale` agrega
+el proxy nginx y la segunda réplica de la API. El navegador se conecta al proxy
+con ese perfil o directamente a la API con el perfil `backend`. Los puertos de
+Compose se publican en `127.0.0.1` y el chat local usa `ws://`.
+[Manual de despliegue](../manuales/DESPLIEGUE.md).
 
 ```mermaid
 flowchart TB
-    subgraph Host["Equipo anfitrión (Windows)"]
+    B["Navegador con el widget"]
+    subgraph Host["Equipo anfitrión"]
         DEMO["Demo Vite :5173"]
         OLLAMA["Ollama :11434"]
         subgraph Docker["Docker Compose"]
@@ -97,7 +56,9 @@ flowchart TB
             REDIS[("redis :6379")]
         end
     end
-    DEMO -- "HTTP y WebSocket" --> PROXY
+    B -- "Carga la demo" --> DEMO
+    B -- "HTTP y WebSocket con scale" --> PROXY
+    B -. "Acceso directo con backend" .-> API
     PROXY --> API
     PROXY --> REPLICA
     API --> MCPS
@@ -152,18 +113,3 @@ flowchart TB
 | Ollama local detrás del puerto `LanguageModel` | Proveedor en la nube | Sin costo y sin registrar tarjeta | Ollama es el cuello de botella de cómputo; otro proveedor solo requiere otro adaptador de `LanguageModel` |
 | Groq como segundo adaptador de `LanguageModel` | Solo Ollama | Inferencia más rápida sin depender del equipo local, sin tarjeta | Depende de la cuota gratuita (`rate_limited`) y envía las conversaciones a un servicio externo |
 | Acciones de navegación ejecutadas por el cliente y validadas por el servidor | Que el LLM genere enlaces | El LLM no puede producir URLs (`safeOutput` las rechaza); la API comprueba que la acción coincida con la petición del usuario | La pestaña se abre sin clic en un enlace y solo hacia IMDb o Google Books |
-
-## Por qué escala
-
-- **API sin estado local relevante.** Con `SESSION_STORE=redis`, las sesiones,
-  el hash del token, los turnos y el lease viven en Redis. Una sesión creada en
-  una réplica continúa en otra, y no se necesitan sesiones pegajosas.
-- **MCP sin sesión.** Cada solicitud es independiente, y la caché y las cuotas
-  se comparten en Redis con operaciones atómicas.
-- **Límites por réplica.** `MAX_CONNECTIONS` y `MAX_CONCURRENT_TURNS` protegen
-  cada proceso. Para agregar capacidad se agregan réplicas.
-- **Lo que no escala** en esta entrega es el modelo (Ollama es un proceso en un
-  equipo y Groq está limitado por su cuota gratuita) y las
-  cuotas de los proveedores, que no aumentan con más réplicas.
-
-El análisis completo y las mediciones están en [ESCALABILIDAD.md](./ESCALABILIDAD.md).

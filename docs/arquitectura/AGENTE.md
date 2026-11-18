@@ -4,139 +4,153 @@ Este documento describe cómo funciona por dentro el agente de películas, cómo
 clasifica y qué controles de seguridad aplica. La implementación está en
 `packages/agent/src/` y la integración con la red en `apps/api/src/server.ts`.
 
-Revisado contra el código del commit `ccd40d9`. Después se integraron en `main`
-el proveedor Groq, la reducción del contexto de herramientas (`toolContext.ts`) y
-las comparaciones con Wikidata; las notas de este documento indican esos cambios.
-
 ## Clasificación
 
-AGIChat usa **un único agente con orquestación centralizada**, que repite un
-ciclo de llamada al modelo y ejecución de herramientas (*tool-calling loop*).
-**No es un sistema multiagente.**
+AGIChat usa **un único agente con orquestación centralizada**. `MovieAgent`
+controla el turno y decide cuándo resolverlo con reglas y herramientas o pedir
+ayuda al modelo.
 
-| Criterio | AGIChat |
+| Componente | Responsabilidad |
 | --- | --- |
-| Número de agentes | Uno: `MovieAgent` |
-| Quién decide | El modelo propone llamadas a herramientas; `MovieAgent` las autoriza, ejecuta y limita |
-| Comunicación entre agentes | No existe |
-| Herramientas | 6 herramientas de solo lectura en un servidor MCP |
+| `MovieAgent` | Recupera el contexto, aplica las políticas, coordina las consultas y arma la respuesta. |
+| `LanguageModel` | Ollama o Groq. Propone llamadas a herramientas para los turnos que requieren inferencia. |
+| `McpGateway` | Descubre herramientas de solo lectura de la lista permitida y valida sus argumentos. |
+| Servidor MCP | Devuelve datos estructurados de seis herramientas de solo lectura con el catálogo de libros habilitado. |
 
-**Por qué no es jerárquico.** No hay un agente orquestador que delegue en
-subagentes. `MovieAgent` habla directamente con el modelo y con el gateway MCP.
+La orquestación es centralizada porque `MovieAgent` conserva el control del turno
+y aplica las mismas políticas a las rutas directas y a las asistidas por el
+modelo. Las herramientas son funciones que ejecutan consultas concretas. Una
+réplica de la API ejecuta su propia instancia de `MovieAgent` para las sesiones
+que atiende. Los puertos `LanguageModel` y `ToolGateway` permiten probar el
+flujo con dobles deterministas.
 
-**Por qué no es descentralizado.** No hay agentes pares que negocien entre sí.
-Un único bucle controla todo el turno: contexto, límites, herramientas y la
-salida final.
+## Diagrama de organización del agente
 
-**Por qué 6 herramientas no son 6 agentes.** Una herramienta MCP es una función
-determinista. Recibe argumentos validados y devuelve datos estructurados. No
-razona, no conserva memoria y no decide qué hacer después. La única entidad que
-decide es el modelo, dentro del ciclo de `MovieAgent`.
+```mermaid
+flowchart TB
+    subgraph API["Proceso de la API de chat"]
+        CHAT["Servidor de chat y sesiones"] -->|"ChatAgent"| AGENT["MovieAgent (único agente)"]
+        AGENT --> POLICY["Políticas de entrada y salida"]
+        AGENT --> EVIDENCE["Contexto de conversación y evidencia"]
+        AGENT -->|"LanguageModel"| MODEL["Adaptador de inferencia"]
+        AGENT -->|"ToolGateway"| GATEWAY["McpGateway"]
+    end
 
-**Por qué basta para este alcance.** La tarea es una conversación por turnos con
-pocas herramientas de lectura. Un único agente:
+    MODEL --> INFERENCE["Ollama o Groq"]
+    GATEWAY -->|"MCP Streamable HTTP"| SERVER
 
-- mantiene un solo punto donde se aplican los controles de seguridad;
-- reduce la latencia, porque Ollama es el recurso más lento y un MAS
-  multiplicaría sus llamadas;
-- facilita las pruebas deterministas, ya que el modelo y el gateway son puertos
-  (`LanguageModel` y `ToolGateway`) que se sustituyen por dobles.
+    subgraph MCP["Proceso del servidor MCP"]
+        SERVER["agichat-tools"]
+        SERVER --> MOVIES["Herramientas de películas"]
+        SERVER --> BOOKS["Herramientas de libros y comparación"]
+    end
+```
 
-**Evolución posible (trabajo futuro, no implementado).** Un orquestador que
-delegue en un subagente de películas y otro de libros convertiría el diseño en
-**jerárquico**. Tendría sentido si cada dominio necesitara su propio
-razonamiento de varios pasos o su propio modelo. Hoy no se justifica.
+`MovieAgent` concentra la coordinación. El adaptador de inferencia consulta al
+modelo configurado. `McpGateway` valida las llamadas y el servidor MCP ejecuta
+las herramientas de solo lectura. La vista muestra la configuración con el
+catálogo de libros habilitado.
 
 ## Diagrama 1: ciclo interno de `MovieAgent.respond`
 
-El diagrama sigue el orden de `packages/agent/src/MovieAgent.ts` en `ccd40d9`. En
-`main` se mantuvo ese ciclo y se agregaron el estado de la conversación (película
-seleccionada, criterios y candidatas), la verificación de respuestas
-(`grounding.ts`) y la reducción del contexto de herramientas (`toolContext.ts`).
-Esos agregados no están dibujados.
+El flujo distingue las rutas directas y el bucle del modelo. La salida del
+agente incluye texto y, cuando hay evidencia, tarjetas con póster y referencias.
 
 ```mermaid
 flowchart TD
-    START(["Mensaje del usuario e historial"]) --> NAV{"¿Pide abrir una referencia?"}
-    NAV -- "Sí, referencia única" --> OPEN["Devolver acción open-reference"]
-    NAV -- "Sí, ambigua o desconocida" --> ASK["Pedir el identificador"]
-    NAV -- "No" --> ATK{"isPromptAttack"}
-    ATK -- "Detecta ataque" --> REFUSE["Rechazo fijo, sin llamar al modelo"]
-    ATK -- "No detecta" --> CTX["Contexto: SYSTEM_PROMPT y últimos 10 turnos, omitiendo turnos de ataque"]
-    CTX --> MCPOPEN["Abrir sesión MCP: tools/list, lista permitida y readOnlyHint"]
-    MCPOPEN --> STEP{"¿Quedan pasos? (máximo 5)"}
-    STEP -- "No" --> LIMIT["limit_exceeded"]
-    STEP -- "Sí" --> MODEL["Llamar al modelo con las herramientas permitidas"]
-    MODEL --> CALLS{"¿Hay tool calls?"}
-    CALLS -- "No" --> SAFE{"safeOutput"}
-    SAFE -- "Válida" --> ANSWER["Responder con texto, películas y referencias"]
-    SAFE -- "Inválida" --> DENY1["policy_denied"]
-    CALLS -- "Sí" --> COUNT{"¿Más de 3?"}
-    COUNT -- "Sí" --> LIMIT
-    COUNT -- "No" --> ALLOWED{"¿Herramienta permitida?"}
-    ALLOWED -- "No" --> DENY2["policy_denied"]
-    ALLOWED -- "Sí" --> AJV{"¿Argumentos válidos según Ajv?"}
-    AJV -- "No" --> DENY2
-    AJV -- "Sí" --> CALL["Ejecutar la herramienta por MCP"]
-    CALL --> TRIM["Recortar a 5 elementos; más de 32000 caracteres es limit_exceeded"]
-    TRIM --> EVID["collectEvidence: tarjetas y referencias de campos conocidos"]
-    EVID --> UNTRUST["Agregar al contexto con trust: untrusted_external"]
-    UNTRUST --> STEP
+    IN(["Mensaje e historial de sesión"]) --> CTX["Recuperar película, preferencias y referencias conocidas"]
+    CTX --> NAV{"¿Pide abrir una referencia?"}
+    NAV -- "Sí" --> KNOWN{"¿Referencia autorizada y única?"}
+    KNOWN -- "Sí" --> ACT["Entregar open-reference a la API"]
+    KNOWN -- "No" --> ASK["Pedir aclaración o rechazar la acción"]
+    NAV -- "No" --> ATK{"¿Entrada detectada como ataque?"}
+    ATK -- "Sí" --> REFUSE["Responder con un rechazo fijo"]
+    ATK -- "No" --> LOCAL{"¿Hay una respuesta local?"}
+    LOCAL -- "Sí" --> FIXED["Responder o pedir aclaración"]
+    LOCAL -- "No" --> OPEN["McpGateway descubre herramientas de solo lectura permitidas"]
+    OPEN --> ROUTE{"¿Recomendación o comparación con ruta directa?"}
+    ROUTE -- "Sí" --> DIRECT["Seleccionar consultas MCP a partir de la petición y el contexto"]
+    ROUTE -- "No" --> MODEL["Llamar al modelo con historial filtrado y herramientas permitidas"]
+    MODEL --> CALLS{"¿Propone llamadas?"}
+    CALLS -- "Sí" --> CHECK["Comprobar las herramientas ofrecidas y el límite por paso"]
+    CHECK --> TOOL
+    DIRECT --> TOOL["McpGateway valida argumentos con Ajv y llama al servidor MCP"]
+    TOOL --> EVID["Recoger evidencia, tarjetas y referencias de datos estructurados"]
+    EVID --> NEXT{"¿Hace falta otro paso del modelo?"}
+    NEXT -- "Sí, quedan pasos" --> DATA["Acotar y marcar el resultado como untrusted_external"]
+    DATA --> MODEL
+    NEXT -- "No" --> OUT["Validar con safeOutput y devolver texto, tarjetas y referencias"]
+    CALLS -- "No" --> TEXT["Validar el texto del modelo y comprobar la evidencia"]
+    TEXT -- "Evidencia suficiente" --> OUT
+    TEXT -- "Falta evidencia" --> REC["Pedir evidencia al modelo, consultar MCP directamente o aclarar"]
+    REC -- "Otro paso disponible" --> MODEL
+    REC -- "Consulta directa" --> DIRECT
+    REC -- "Aclaración" --> OUT
 ```
 
-Detalles que el diagrama simplifica:
-
-- El modelo es un puerto (`LanguageModel`). Además de Ollama local,
-  `AGENT_MODE=groq` usa inferencia alojada en Groq y conserva las herramientas
-  MCP. Ver [Inicio con Groq](../GROQ-INICIO.md).
-
-- La validación con Ajv ocurre dentro de `McpGateway.call`. Si los argumentos
-  no cumplen el JSON Schema descubierto, el gateway lanza `policy_denied`.
-- Si la herramienta responde con error, el gateway entrega al modelo solo
-  `{ "error": "tool_unavailable" }` y no reenvía detalles internos.
-- La sesión MCP se cierra siempre al terminar el turno (`finally`).
-- Si no se puede abrir la sesión MCP, el turno termina con `unavailable`.
+- Las rutas directas cubren recomendaciones sencillas por género, seguimientos
+  con criterios ya conocidos y comparaciones de una película identificada.
+- `compare_movie_book` busca evidencia de la adaptación y devuelve un veredicto
+  cuando puede vincular las obras. Si la coincidencia sigue siendo incierta, el
+  agente solicita más información o indica que falta evidencia.
+- En el bucle, `MovieAgent` admite hasta cinco pasos del modelo y hasta tres
+  llamadas propuestas por paso. Las rutas directas tienen su propia lógica.
+- `groundedText` arma el texto a partir de evidencia estructurada. `toolContext`
+  compacta los datos que vuelven al modelo. La tabla de límites distingue ese
+  contexto del historial que se usa para resolver referencias.
+- Una herramienta rechazada o una salida inválida pueden terminar en
+  `policy_denied`. Si se agotan los pasos, el agente usa un resumen válido
+  disponible o devuelve el error correspondiente. La conexión MCP se cierra
+  al terminar el turno, incluso si falla o se cancela.
 
 ## Diagrama 2: secuencia de un turno completo
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant W as Widget
-    participant T as Transporte WebSocket
+    participant W as Widget y transporte WebSocket
     participant A as API
     participant R as Redis
     participant M as MovieAgent
-    participant O as Ollama
+    participant L as Modelo (Ollama o Groq)
     participant S as Servidor MCP
-    participant P as TMDB o Google Books
+    participant P as TMDB, Google Books o Wikidata
 
-    W->>T: sendUserMessage(texto)
-    T->>A: user-message con requestId
-    A->>R: acquire lease de la sesión
-    R-->>A: lease concedido
-    A->>R: get sesión y turnos
-    A-->>T: agent-typing true
-    A->>M: respond(contenido, historial)
-    M->>S: initialize y tools/list
-    loop Hasta 5 pasos
-        M->>O: POST /api/chat con herramientas
-        O-->>M: texto o tool_calls
-        opt Hay tool_calls
-            M->>S: tools/call con argumentos validados
-            S->>R: caché y reserva de cuota
-            S->>P: consulta si no hay caché
-            P-->>S: datos externos
-            S-->>M: structuredContent
+    W->>A: user-message con requestId
+    A->>R: adquiere el bloqueo del turno y carga el historial
+    R-->>A: sesión y contexto
+    A-->>W: agent-typing true
+    A->>M: respond con mensaje, historial y contexto
+    alt Respuesta local o navegación
+        M->>M: resuelve la petición a partir del mensaje y el historial
+    else Consulta con herramientas
+        M->>S: inicializa el cliente MCP y descubre herramientas mediante McpGateway
+        loop Consultas que requiere el turno
+            opt La petición requiere inferencia
+                M->>L: envía contexto y herramientas permitidas
+                L-->>M: texto o llamadas propuestas
+            end
+            opt Consulta autorizada
+                M->>S: McpGateway valida argumentos y ejecuta tools/call
+                S->>R: consulta la caché y reserva cuota si necesita llamar al proveedor
+                opt No hay datos en caché
+                    S->>P: consulta la fuente pertinente
+                    P-->>S: datos externos
+                end
+                S-->>M: structuredContent
+                M->>M: recoge evidencia y actualiza el contexto
+            end
         end
+        M->>M: cierra el cliente MCP
     end
-    M-->>A: content, movies, references y actions
-    A->>A: valida acciones contra la petición del usuario
-    A->>R: commit del turno (verifica dueño del lease)
-    A->>R: release del lease
-    A-->>T: agent-message
-    A-->>T: agent-typing false
-    T-->>W: mensaje, tarjetas con póster y referencias
+    M-->>A: texto, tarjetas, referencias, acciones y contexto
+    opt Hay una acción de navegación
+        A->>A: comprueba proveedor e identificador contra la petición
+    end
+    A->>R: guarda el turno si conserva el bloqueo
+    A->>R: libera el bloqueo
+    A-->>W: agent-message
+    A-->>W: agent-typing false
 ```
 
 El servidor libera el lease antes de enviar `agent-message`. En `ccd40d9` el
@@ -191,14 +205,15 @@ Reglas que garantizan que solo se abre lo que el usuario pidió:
 
 ## Diagrama 4: defensas en capas
 
-El diagrama sigue el camino de un mensaje. Cada capa indica los controles que
-aplica y el riesgo que mitiga.
+El diagrama sigue un turno que entra en el bucle del modelo. Las rutas directas
+con herramientas también pasan por la validación del gateway y de la salida.
+Los controles se evalúan en [los casos OWASP LLM01 y LLM07](../evals/EVALS.md).
 
 ```mermaid
 flowchart TD
     U(["Mensaje del usuario"]) --> API1["API: orígenes permitidos, token con hash y límites de tamaño y frecuencia (abuso)"]
     API1 --> AG1["Agente: isPromptAttack con rechazo fijo, sin llamar al modelo (LLM01 y LLM07)"]
-    AG1 --> AG2["Agente: historial sin turnos de ataque y máximo 5 pasos con 3 herramientas (LLM01)"]
+    AG1 --> AG2["Agente: historial sin turnos de ataque, hasta 5 pasos del modelo y 3 llamadas propuestas por paso (LLM01)"]
     AG2 --> GW["Gateway MCP: lista permitida, readOnlyHint y argumentos validados con Ajv (LLM01)"]
     GW --> SRV["Servidor MCP: esquemas, limpieza de caracteres invisibles y campos sospechosos (LLM01 indirecto)"]
     SRV --> AG3["Agente: resultados marcados untrusted_external y errores reducidos a tool_unavailable (LLM01 y LLM07)"]
@@ -218,7 +233,7 @@ flowchart TD
 | Agente | Los turnos de ataque no vuelven al contexto | `MovieAgent.ts` | LLM01 en varios turnos |
 | Agente | Resultados de herramientas como `untrusted_external` | `MovieAgent.ts` | LLM01 indirecto |
 | Agente | `safeOutput` rechaza el marcador, URLs, `javascript:`, `data:`, HTML y enlaces Markdown | `policy.ts` | LLM07 y LLM01 |
-| Agente | Máximo 5 pasos y 3 herramientas por paso | `MovieAgent.ts` | Consumo excesivo |
+| Agente | Hasta 5 pasos del modelo y 3 llamadas propuestas por paso | `MovieAgent.ts` | Consumo excesivo |
 | Gateway MCP | Solo herramientas permitidas y con `readOnlyHint=true` | `McpGateway.ts` | LLM01 (herramientas no autorizadas) |
 | Gateway MCP | Argumentos validados con Ajv | `McpGateway.ts` | LLM01 (argumentos manipulados) |
 | Gateway MCP | Errores convertidos en `tool_unavailable` | `McpGateway.ts` | Filtración de detalles internos |
@@ -246,9 +261,10 @@ El contrato completo está en [SERVIDOR-MCP.md](../manuales/SERVIDOR-MCP.md).
 
 | Límite | Valor | Dónde |
 | --- | --- | --- |
-| Pasos por turno | 5 | `MovieAgent` (`maxSteps`) |
-| Herramientas por paso | 3 | `MovieAgent` y esquema de `OllamaModel` |
-| Turnos de historial enviados al modelo | 10 | `MovieAgent` |
+| Pasos del bucle del modelo | 5 | `MovieAgent` (`maxSteps`) |
+| Llamadas propuestas por paso del modelo | 3 | `MovieAgent` y esquema de `OllamaModel` |
+| Turnos de historial considerados para el modelo | Hasta 6, filtrados y recortados | `MovieAgent` |
+| Turnos previos usados para recuperar referencias | Hasta 10, además del contexto vigente | `MovieAgent` |
 | Elementos por resultado de herramienta | 5 | `MovieAgent` (`results` y `candidates`) |
 | Tamaño máximo de un resultado | 32,000 caracteres | `MovieAgent` |
 | Tamaño máximo de una respuesta | 6,000 caracteres | `safeOutput` |
@@ -256,7 +272,8 @@ El contrato completo está en [SERVIDOR-MCP.md](../manuales/SERVIDOR-MCP.md).
 | Referencias por respuesta | 20 | `MovieAgent` y protocolo |
 | Parámetros con Ollama | `temperature 0`, `num_predict 384` (1024 en `ccd40d9`), `num_ctx 8192`, `think: false`, sin streaming | `OllamaModel.ts` |
 | Parámetros con Groq | `temperature 0`, `max_completion_tokens 2048`, `parallel_tool_calls: false`, sin streaming | `GroqModel.ts` |
-| Tiempo por llamada MCP | 10 s | `McpGateway` |
+| Tiempo por llamada a una herramienta MCP | 18 s por defecto | `McpGateway` |
+| Plazo compartido para conectar y listar herramientas MCP | 10 s por defecto | `McpGateway` |
 | Tiempo por turno | `TURN_TIMEOUT_MS` (60 s por defecto; 180 s en la guía de arranque) | `apps/api/src/config.ts` |
 
 ## Códigos de error del protocolo

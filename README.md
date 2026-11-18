@@ -86,75 +86,18 @@ El recorrido completo, con los mensajes exactos, está en el
 
 ## Arquitectura de alto nivel
 
-```mermaid
-flowchart LR
-    subgraph Cliente["Navegador"]
-        W["Widget: embed, react y core"]
-        T["Transporte WebSocket"]
-        W --> T
-    end
-    subgraph Backend["Backend"]
-        P["Proxy nginx"]
-        A["API: réplicas A y B"]
-        G["MovieAgent"]
-        O["Ollama local o Groq"]
-        M["Servidor MCP"]
-        P --> A --> G
-        G --> O
-        G --> M
-    end
-    R[("Redis: sesiones, leases, caché y cuotas")]
-    E["TMDB y Google Books"]
-    T -- "POST /sessions y WebSocket /chat" --> P
-    A --> R
-    M --> R
-    M --> E
-    W -. "pestaña validada" .-> X["IMDb y Google Books"]
-```
-
-Por qué esta arquitectura:
-
-- **Puertos y adaptadores.** `core` no conoce la red. La Fase 2 agregó
-  `transport-websocket` sin cambiar el dominio del chat.
-- **WebSocket.** Permite cancelar, mostrar «escribiendo» y correlacionar cada
-  respuesta con su petición.
-- **MCP con Streamable HTTP sin sesión.** Las herramientas sirven a cualquier
-  cliente MCP y cualquier réplica atiende cualquier llamada.
-- **Un solo servidor MCP.** Películas y libros comparten transporte, caché y
-  cuotas, y la comparación necesita ambos catálogos.
-- **Estado en Redis.** Sesiones, leases, caché y cuotas son compartidos, así que
-  la API y el MCP se replican sin sesiones pegajosas.
-- **Modelo detrás de `LanguageModel`.** Ollama local (predeterminado) o Groq
-  alojado (`AGENT_MODE=groq`), ambos sin costo ni tarjeta. Cambiar de proveedor
-  solo requiere otro adaptador.
-- **Navegación en el cliente, validada en el servidor.** El modelo nunca genera
-  URLs.
-
-Detalle completo en [ALTO-NIVEL.md](docs/arquitectura/ALTO-NIVEL.md).
+El widget del Proyecto 1 se comunica con la API de chat. La API ejecuta el
+agente de películas y se conecta al modelo de lenguaje y al servidor MCP.
+Redis guarda el estado compartido. El servidor MCP consulta las fuentes de
+películas, libros y adaptaciones.
+[Diagrama de alto nivel](docs/arquitectura/ALTO-NIVEL.md#diagrama-de-contexto).
 
 ## Organización del agente
 
-AGIChat usa **un único agente con orquestación centralizada** que repite un ciclo
-de modelo y herramientas. **No es un sistema multiagente**: las 6 herramientas
-MCP son funciones deterministas de solo lectura, no agentes.
-
-```mermaid
-flowchart TD
-    IN(["Mensaje del usuario"]) --> NAV{"¿Pide abrir una referencia?"}
-    NAV -- "Sí" --> ACT["Acción open-reference validada"]
-    NAV -- "No" --> ATK{"¿Ataque detectado?"}
-    ATK -- "Sí" --> REF["Rechazo fijo"]
-    ATK -- "No" --> LLM["Modelo con herramientas permitidas"]
-    LLM --> TC{"¿Pide herramientas?"}
-    TC -- "Sí, máximo 3" --> TOOL["MCP: argumentos validados y resultado no confiable"]
-    TOOL --> LLM
-    TC -- "No" --> SAFE{"safeOutput"}
-    SAFE -- "Válida" --> OUT["Respuesta, tarjetas y referencias"]
-    SAFE -- "Inválida" --> DEN["policy_denied"]
-```
-
-Como máximo hay 5 pasos por turno. La clasificación, las secuencias y las
-defensas en capas están en [AGENTE.md](docs/arquitectura/AGENTE.md).
+AGIChat usa un único agente con orquestación centralizada. `MovieAgent` resuelve
+algunas peticiones directamente y recurre al modelo cuando necesita inferencia.
+Con el catálogo de libros habilitado, MCP expone seis herramientas de solo lectura.
+[Diagrama de bajo nivel](docs/arquitectura/AGENTE.md#diagrama-de-organización-del-agente).
 
 ## Escalabilidad
 
