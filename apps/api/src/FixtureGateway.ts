@@ -8,7 +8,7 @@ export class FixtureGateway implements ToolGateway {
       tools: [{ name: "recommend_movies", description: "Datos ficticios de integración", inputSchema: { type: "object", additionalProperties: false } }],
       call: async (_call, callSignal) => {
         callSignal.throwIfAborted();
-        return { isError: false, data: { candidates: [{ id: 501, title: "Película ficticia de integración", year: 2020, poster: null, imdb_id: null }] } };
+        return { isError: false, data: { source: "fixture", candidates: [{ id: 501, title: "Película ficticia de integración", year: 2020, poster: null, imdb_id: null }] } };
       },
       close: async () => undefined
     };

@@ -71,8 +71,8 @@ export function createChatServer(config: ApiConfig, agent: ChatAgent, store: Ses
     const send = (frame: ServerFrame) => { if (ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(serverFrameSchema.parse(frame))); } };
     const error = (code: ErrorCode, requestId?: string) => send({
       version: 1, type: "error", ...(requestId === undefined ? {} : { requestId }), code,
-      message: ({ invalid_frame: "Mensaje inválido.", unauthorized: "Sesión no autorizada.", session_expired: "La sesión expiró.", busy: "Hay una solicitud en curso. Intenta nuevamente.", duplicate_request: "El identificador ya se utilizó para otra solicitud.", timeout: "La solicitud excedió el tiempo disponible.", cancelled: "Solicitud cancelada.", unavailable: "El servicio no está disponible temporalmente.", rate_limited: "El proveedor de IA alcanzó su cuota de solicitudes o tokens. Espera a que se restablezca la cuota antes de intentar nuevamente.", policy_denied: "La operación no está permitida.", limit_exceeded: "La solicitud excedió los límites permitidos." })[code],
-      retryable: ["busy", "timeout", "unavailable"].includes(code)
+      message: ({ invalid_frame: "Mensaje inválido.", unauthorized: "Sesión no autorizada.", session_expired: "La sesión expiró.", busy: "Hay una solicitud en curso. Intenta nuevamente.", duplicate_request: "El identificador ya se utilizó para otra solicitud.", timeout: "La solicitud excedió el tiempo disponible.", cancelled: "Solicitud cancelada.", unavailable: "El servicio no está disponible temporalmente.", rate_limited: "Groq aplicó un límite de uso temporal. Intenta nuevamente más tarde.", policy_denied: "La operación no está permitida.", limit_exceeded: "La solicitud excedió los límites permitidos." })[code],
+      retryable: ["busy", "timeout", "unavailable", "rate_limited"].includes(code)
     });
     const authTimer = setTimeout(() => { ws.close(1008, "Authentication required"); }, 5000);
     ws.on("error", () => { disconnected.abort(); });
@@ -107,7 +107,7 @@ export function createChatServer(config: ApiConfig, agent: ChatAgent, store: Ses
         send({ version: 1, type: "agent-typing", requestId: frame.requestId, isTyping: true });
         const reply = await abortable(agent.respond({
           content: frame.content,
-          history: session.turns.map((turn) => ({ user: turn.user, assistant: turn.frame.message.content, references: turn.frame.references })),
+          history: session.turns.map((turn) => ({ user: turn.user, assistant: turn.frame.message.content, references: turn.frame.references, ...(turn.context === undefined ? {} : { context: turn.context }) })),
           ...(frame.openReference === undefined ? {} : { openReference: frame.openReference }), signal
         }), signal);
         signal.throwIfAborted();
@@ -122,7 +122,7 @@ export function createChatServer(config: ApiConfig, agent: ChatAgent, store: Ses
           movies: reply.movies, references: reply.references, actions: reply.actions
         });
         if (response.type !== "agent-message") { throw new Error("invalid_agent_response"); }
-        const committed = await store.commit(identity.id, owner, { requestId: frame.requestId, fingerprint, user: frame.content, frame: response }, config.sessionTtlMs);
+        const committed = await store.commit(identity.id, owner, { requestId: frame.requestId, fingerprint, user: frame.content, frame: response, ...(reply.context === undefined ? {} : { context: reply.context }) }, config.sessionTtlMs);
         signal.throwIfAborted();
         if (!committed) { error("session_expired", frame.requestId); return; }
         send(response);

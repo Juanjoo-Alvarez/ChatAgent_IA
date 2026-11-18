@@ -8,8 +8,8 @@ const id = z.string().uuid();
 const base = { version: z.literal(PROTOCOL_VERSION) };
 
 export const referenceSchema = z.discriminatedUnion("provider", [
-  z.strictObject({ provider: z.literal("imdb"), id: z.string().regex(/^tt\d{7,10}$/) }),
-  z.strictObject({ provider: z.literal("google-books"), id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/) })
+  z.strictObject({ provider: z.literal("imdb"), id: z.string().regex(/^tt\d{7,10}$/), label: z.string().trim().min(1).max(350).optional(), aliases: z.array(z.string().trim().min(1).max(350)).max(5).optional() }),
+  z.strictObject({ provider: z.literal("google-books"), id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/), label: z.string().trim().min(1).max(350).optional(), aliases: z.array(z.string().trim().min(1).max(350)).max(5).optional() })
 ]);
 export type Reference = z.infer<typeof referenceSchema>;
 

@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { Ajv } from "ajv";
 import { setTimeout as delay } from "node:timers/promises";
 import { AgentError, type LanguageModel, type ModelMessage, type ToolDefinition } from "./types.js";
 
 const responseSchema = z.object({ choices: z.array(z.object({
-  finish_reason: z.enum(["stop", "tool_calls"]),
+  finish_reason: z.enum(["stop", "tool_calls", "length"]),
   message: z.object({ content: z.string().max(12000).nullish(), tool_calls: z.array(z.object({
     id: z.string().min(1), type: z.literal("function"),
     function: z.object({ name: z.string().min(1).max(100), arguments: z.string().max(16000) })
@@ -11,6 +12,7 @@ const responseSchema = z.object({ choices: z.array(z.object({
 })).length(1) });
 
 const toolValidationErrorSchema = z.object({ error: z.object({ code: z.literal("tool_use_failed") }) });
+const truncatedResponseSchema = z.object({ choices: z.array(z.object({ finish_reason: z.literal("length") })).length(1) });
 const toolCorrection = {
   role: "system",
   content: "La llamada anterior no cumplió el esquema de las herramientas. Genera una llamada válida usando únicamente las herramientas disponibles y los tipos definidos en su esquema. Si un parámetro opcional no tiene valor, omite la propiedad; no envíes null. No inventes resultados de herramientas."
@@ -18,7 +20,16 @@ const toolCorrection = {
 
 /** Solo inferencia: las herramientas se ejecutan en nuestro backend mediante MCP. */
 export class GroqModel implements LanguageModel {
-  public constructor(private readonly options: { readonly apiKey: string; readonly model: string; readonly fetch?: typeof fetch }) {
+  public constructor(private readonly options: {
+    readonly apiKey: string;
+    readonly model: string;
+    readonly fetch?: typeof fetch;
+    readonly onRateLimit?: (event: {
+      readonly retryAfterSeconds: number | null;
+      readonly remainingRequests: number | null;
+      readonly remainingTokens: number | null;
+    }) => void;
+  }) {
     if (!options.apiKey.trim() || !options.model.trim()) { throw new Error("Groq requires an API key and model"); }
   }
 
@@ -49,39 +60,71 @@ export class GroqModel implements LanguageModel {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.options.apiKey}` },
         body: JSON.stringify(body)
       };
-      const send = () => (this.options.fetch ?? fetch)("https://api.groq.com/openai/v1/chat/completions", request);
-      let response = await send();
-      if (response.status === 429) {
-        const retryAfter = response.headers.get("retry-after");
-        const seconds = retryAfter === null ? NaN : Number(retryAfter);
-        // Solo un reintento, con espera explícita y acotada; respeta cancelación.
-        if (Number.isFinite(seconds) && seconds >= 0 && seconds <= 30) {
-          await response.body?.cancel();
-          await delay(Math.max(100, seconds * 1000), undefined, { signal });
-          response = await send();
-        }
-      }
-      if (response.status === 400 && tools.length > 0) {
-        const failure: unknown = await response.json().catch(() => null);
-        if (toolValidationErrorSchema.safeParse(failure).success) {
-          // Una sola corrección. Nunca ejecutar failed_generation ni reenviar el error privado.
-          signal.throwIfAborted();
-          response = await (this.options.fetch ?? fetch)("https://api.groq.com/openai/v1/chat/completions", {
-            ...request, body: JSON.stringify({ ...body, messages: [...body.messages, toolCorrection] })
+      const ajv = new Ajv({ strict: false, allErrors: false, validateFormats: false });
+      const validators = new Map(tools.map((tool) => [tool.name, ajv.compile(tool.inputSchema)]));
+      let correction: typeof toolCorrection | undefined;
+      let correctionUsed = false;
+      // Hasta dos esperas breves por 429 y una corrección; máximo tres solicitudes.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        signal.throwIfAborted();
+        const response = await (this.options.fetch ?? fetch)("https://api.groq.com/openai/v1/chat/completions", {
+          ...request, body: JSON.stringify({ ...body, messages: correction === undefined ? body.messages : [...body.messages, correction] })
+        });
+        if (response.status === 429) {
+          const retryAfter = response.headers.get("retry-after");
+          const seconds = retryAfter === null || !retryAfter.trim() ? NaN : Number(retryAfter);
+          const remaining = (name: string) => {
+            const value = response.headers.get(name);
+            if (value === null || !value.trim()) { return null; }
+            const parsed = Number(value);
+            return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+          };
+          this.options.onRateLimit?.({
+            retryAfterSeconds: Number.isFinite(seconds) && seconds >= 0 ? seconds : null,
+            remainingRequests: remaining("x-ratelimit-remaining-requests"),
+            remainingTokens: remaining("x-ratelimit-remaining-tokens")
           });
+          await response.body?.cancel();
+          if (attempt < 2 && Number.isFinite(seconds) && seconds >= 0 && seconds <= 30) {
+            await delay(Math.max(250, seconds * 1000 + 250), undefined, { signal });
+            continue;
+          }
+          throw new AgentError("rate_limited");
+        }
+        if (response.status === 400 && tools.length > 0 && !correctionUsed && attempt < 2) {
+          const failure: unknown = await response.json().catch(() => null);
+          if (toolValidationErrorSchema.safeParse(failure).success) { correction = toolCorrection; correctionUsed = true; continue; }
+        }
+        if (!response.ok) { throw new AgentError("unavailable"); }
+        const raw: unknown = await response.json();
+        if (truncatedResponseSchema.safeParse(raw).success) {
+          if (correctionUsed || attempt === 2) { throw new AgentError("unavailable"); }
+          correction = { role: "system", content: "La respuesta anterior se truncó y fue descartada. Responde brevemente o genera una única llamada válida. No reconstruyas ni inventes resultados de herramientas." };
+          correctionUsed = true;
+          continue;
+        }
+        const choice = responseSchema.parse(raw).choices[0]!;
+        try {
+          const calls = choice.message.tool_calls ?? [];
+          if (new Set(calls.map((call) => call.id)).size !== calls.length
+            || (choice.finish_reason === "tool_calls") !== (calls.length > 0)) { throw new Error("invalid_calls"); }
+          const toolCalls = calls.map((call) => {
+            const args = z.record(z.string(), z.unknown()).parse(JSON.parse(call.function.arguments));
+            if (!validators.get(call.function.name)?.(args)) { throw new Error("invalid_arguments"); }
+            return { id: call.id, name: call.function.name, arguments: args };
+          });
+          const content = choice.message.content ?? "";
+          if (toolCalls.length === 0 && !content.trim()) { throw new Error("empty_response"); }
+          signal.throwIfAborted();
+          return { content, toolCalls };
+        } catch {
+          signal.throwIfAborted();
+          if (correctionUsed || attempt === 2) { throw new AgentError("unavailable"); }
+          correction = toolCorrection;
+          correctionUsed = true;
         }
       }
-      if (response.status === 429) { throw new AgentError("rate_limited"); }
-      // No reenviar cuerpos de error del proveedor.
-      if (!response.ok) { throw new AgentError("unavailable"); }
-      const parsed = responseSchema.parse(await response.json());
-      const message = parsed.choices[0]!.message;
-      const calls = message.tool_calls ?? [];
-      if (new Set(calls.map((call) => call.id)).size !== calls.length) { throw new AgentError("unavailable"); }
-      return { content: message.content ?? "", toolCalls: calls.map((call) => ({
-        id: call.id, name: call.function.name,
-        arguments: z.record(z.string(), z.unknown()).parse(JSON.parse(call.function.arguments))
-      })) };
+      throw new AgentError("unavailable");
     } catch (error) {
       signal.throwIfAborted();
       if (error instanceof AgentError && error.code === "rate_limited") { throw error; }

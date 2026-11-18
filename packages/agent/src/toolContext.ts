@@ -1,3 +1,13 @@
+/** Acota las páginas y sinopsis antes de medir el resultado. Nunca recorta IDs ni fuentes. */
+export function compactResult(data: unknown, key = ""): unknown {
+  if (typeof data === "string" && ["description", "overview"].includes(key)) { return data.slice(0, 800); }
+  if (Array.isArray(data)) {
+    return (key === "results" || key === "candidates" ? data.slice(0, 5) : data).map((value) => compactResult(value, key));
+  }
+  if (typeof data !== "object" || data === null) { return data; }
+  return Object.fromEntries(Object.entries(data).map(([name, value]) => [name, compactResult(value, name)]));
+}
+
 /** Reduce metadatos de presentación; conserva afirmaciones, fuentes y límites.
  * Las tarjetas y referencias se extraen del resultado completo antes de esta proyección.
  */

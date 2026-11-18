@@ -32,6 +32,28 @@ describe("shared reference request grammar", () => {
     expect(resolveReferenceRequest("Abre Google Books", [book]).reference).toEqual(book);
     expect(resolveReferenceRequest("Abre IMDb", []).reference).toBeNull();
   });
+  it("resolves a movie by its visible name and year without treating ambiguous names as unique", () => {
+    const dune2021: Reference = { ...imdb, label: "Duna (2021)" };
+    const dune1984: Reference = { ...other, label: "Duna (1984)" };
+    expect(resolveReferenceRequest("¿Puedes abrir IMDb de Duna (2021)?", [dune2021, dune1984]).reference).toEqual(dune2021);
+    expect(resolveReferenceRequest("Abre IMDb de Duna", [dune2021, dune1984]).reference).toBeNull();
+    expect(resolveReferenceRequest("Abre IMDb de Otra película (2021)", [dune2021, dune1984]).reference).toBeNull();
+    expect(resolveReferenceRequest("Abre IMDb de Duna (2021)", [imdb]).reference).toBeNull();
+  });
+  it("resolves a book by its visible title", () => {
+    const hungerGames: Reference = { ...book, label: "The Hunger Games" };
+    expect(resolveReferenceRequest("Abre Google Books de The Hunger Games", [hungerGames]).reference).toEqual(hungerGames);
+    expect(resolveReferenceRequest("1. Abre Google Books de The Hunger Games", [hungerGames]).reference).toEqual(hungerGames);
+    expect(resolveReferenceRequest("Abre Google Books de Otro libro", [hungerGames]).reference).toBeNull();
+  });
+  it("resolves a verified book by the movie title or a direct contextual request", () => {
+    const hungerGames: Reference = { ...book, label: "The Hunger Games", aliases: ["Los juegos del hambre"] };
+    const imdbHungerGames: Reference = { ...imdb, label: "Los juegos del hambre (2012)" };
+    expect(resolveReferenceRequest("1. Abre Google Books del libro de los juegos del hambre", [hungerGames, imdbHungerGames]).reference).toEqual(hungerGames);
+    expect(resolveReferenceRequest("Pero abre el Google Books del libro que mencionaste", [hungerGames, imdbHungerGames]).reference).toEqual(hungerGames);
+    expect(resolveReferenceRequest("Abre Google Books del libro de Harry Potter", [hungerGames]).reference).toBeNull();
+    expect(resolveReferenceRequest("Abre eso", [hungerGames, imdbHungerGames])).toEqual({ requested: true, reference: null });
+  });
   it.each(["Abre IMDb y Google Books", "¿Puedes abrir Google Books e IMDb?"])("requires one destination at a time: %s", (content) => {
     expect(resolveReferenceRequest(content, [imdb, book])).toEqual({ requested: true, reference: null });
   });

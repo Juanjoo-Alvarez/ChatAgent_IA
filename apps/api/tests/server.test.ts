@@ -50,6 +50,23 @@ describe("HTTP sessions and upgrade security", () => {
 });
 
 describe("authenticated conversation", () => {
+  it("persists typed movie/book context across reconnection without exposing it as protocol fields", async () => {
+    const context = { movies: [{ id: 438631, title: "Dune", year: 2021, poster: null, imdbId: "tt1160419" }], books: [{ id: "Book_Dune", title: "Dune", authors: ["Frank Herbert", "Editor"] }] };
+    const agent = fakeAgent();
+    vi.mocked(agent.respond).mockResolvedValueOnce({ ...reply, context }).mockResolvedValue(reply);
+    const api = await start(agent);
+    const credentials = await api.credentials();
+    const first = await authenticated(api.base, credentials);
+    first.send(message("Recomienda Dune"));
+    const response = await first.next("agent-message");
+    expect(response).not.toHaveProperty("context");
+    expect((await api.store.get(credentials.sessionId))?.turns[0]?.context).toEqual(context);
+    first.ws.terminate();
+    const second = await authenticated(api.base, credentials);
+    second.send(message("Compárala con el libro"));
+    await second.next("agent-message");
+    expect(agent.respond).toHaveBeenLastCalledWith(expect.objectContaining({ history: [expect.objectContaining({ context })] }));
+  });
   it("requires the issued token, not just a session identifier", async () => {
     const api = await start();
     const credentials = await api.credentials();
@@ -162,6 +179,16 @@ describe("authenticated conversation", () => {
     const error = await client.next("error");
     expect(error).toMatchObject({ code: cause instanceof AgentError ? "policy_denied" : "unavailable" });
     expect(JSON.stringify(error)).not.toContain("secret-provider-key");
+  });
+  it("describes a Groq rate limit as temporary and retryable", async () => {
+    const agent = fakeAgent(); vi.mocked(agent.respond).mockRejectedValue(new AgentError("rate_limited"));
+    const api = await start(agent);
+    const client = await authenticated(api.base, await api.credentials());
+    client.send(message());
+    expect(await client.next("error")).toMatchObject({
+      code: "rate_limited", retryable: true,
+      message: "Groq aplicó un límite de uso temporal. Intenta nuevamente más tarde."
+    });
   });
   it("rejects expired sessions during a conversation", async () => {
     let time = 0;

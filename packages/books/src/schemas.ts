@@ -32,5 +32,6 @@ export const comparisonSchema = z.strictObject({
   recommendation: z.strictObject({ verdict: z.enum(["consider", "not_recommended", "undetermined"]), reasons: z.array(z.string()) }),
   limitations: z.array(z.string()), sources: z.array(z.string().url()),
   references: z.array(z.strictObject({ provider: z.literal("google-books"), id: bookIdSchema })),
-  book: bookSchema, movie_id: z.number().int().positive()
+  book: bookSchema, movie_id: z.number().int().positive(),
+  movie: z.strictObject({ id: z.number().int().positive(), title: z.string().nullable(), year: z.number().int().nullable(), poster: z.string().nullable(), imdb_id: z.string().nullable() })
 });

@@ -24,12 +24,18 @@ export interface ToolSession {
   close(): Promise<void>;
 }
 export interface ToolGateway { open(signal: AbortSignal): Promise<ToolSession> }
+export interface EvidenceContext {
+  readonly movies: readonly MovieCard[];
+  readonly books: readonly { readonly id: string; readonly title: string; readonly authors: readonly string[] }[];
+}
 export interface ConversationTurn {
   readonly user: string;
   readonly assistant: string;
   readonly references: readonly Reference[];
+  readonly context?: EvidenceContext;
 }
 export interface AgentReply {
+  readonly context?: EvidenceContext;
   readonly content: string;
   readonly movies: readonly MovieCard[];
   readonly references: readonly Reference[];

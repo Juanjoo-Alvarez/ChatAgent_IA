@@ -37,8 +37,8 @@ que permita afirmar un porcentaje de aceleración.
   ausencia de evidencia; identificar una adaptación no acredita fidelidad.
 
 Reiniciar la API con `pnpm dev:api` para cargar los cambios compilados. La mejora
-reduce trabajo redundante; no garantiza baja latencia en CPU ni amplía el catálogo
-de adaptaciones verificadas, que actualmente cubre Dune (2021).
+reduce trabajo redundante y no garantiza baja latencia en CPU. El catálogo de
+adaptaciones verificadas cubre Dune (2021) y The Hunger Games (2012).
 
 Las pruebas automatizadas verifican reducción de contexto, conservación de datos,
 errores, cierre de MCP y límites de herramientas. La calidad del modelo debe

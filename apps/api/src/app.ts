@@ -13,7 +13,9 @@ export function createApi(config: ApiConfig) {
   redis?.on("error", () => undefined);
   const store = redis === null ? new InMemorySessionStore() : new RedisSessionStore(redis);
   const model = config.mode === "fixture" ? new FixtureModel() : config.mode === "groq"
-    ? new GroqModel({ apiKey: config.groqApiKey, model: config.groqModel })
+    ? new GroqModel({ apiKey: config.groqApiKey, model: config.groqModel, onRateLimit: (details) => {
+      console.warn(JSON.stringify({ event: "groq_rate_limited", ...details }));
+    } })
     : new OllamaModel({ url: config.ollamaUrl, model: config.ollamaModel });
   const gateway = config.toolsMode === "fixture" ? new FixtureGateway() : new McpGateway(config.mcpUrl);
   const server = createChatServer(config, new MovieAgent(model, gateway), store);

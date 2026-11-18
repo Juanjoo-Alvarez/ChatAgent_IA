@@ -1,10 +1,12 @@
 import type { AgentMessageFrame } from "@agichat/protocol";
+import type { EvidenceContext } from "@agichat/agent";
 
 export interface SavedTurn {
   readonly requestId: string;
   readonly fingerprint: string;
   readonly user: string;
   readonly frame: AgentMessageFrame;
+  readonly context?: EvidenceContext;
 }
 export interface Session { readonly tokenHash: string; readonly turns: readonly SavedTurn[] }
 export interface SessionStore {

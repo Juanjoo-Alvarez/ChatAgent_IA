@@ -45,6 +45,23 @@ describe("ReferenceNavigator", () => {
     expect(open).toHaveBeenCalledOnce();
     navigator.finish();
   });
+  it("reserves a tab for a movie selected by its visible name", () => {
+    const { navigator, popup, open } = harness();
+    const selected = { ...imdb, label: "Duna (2021)" };
+    const other = { provider: "imdb", id: "tt7654321", label: "Duna (1984)" };
+    navigator.begin("¿Puedes abrir IMDb de Duna (2021)?", [selected, other]);
+    expect(open).toHaveBeenCalledOnce();
+    navigator.accept(action(selected));
+    expect(popup.location.replace).toHaveBeenCalledWith("https://www.imdb.com/title/tt1234567/");
+  });
+  it("reserves a tab for a numbered book request using the verified movie title", () => {
+    const { navigator, popup, open } = harness();
+    const selected = { ...book, label: "The Hunger Games", aliases: ["Los juegos del hambre"] };
+    navigator.begin("1. Abre Google Books del libro de los juegos del hambre", [selected, imdb]);
+    expect(open).toHaveBeenCalledOnce();
+    navigator.accept(action(selected));
+    expect(popup.location.replace).toHaveBeenCalledWith("https://books.google.com/books?id=volume_1");
+  });
   it("rejects unexpected or malformed actions and closes the unused reservation", () => {
     const { navigator, popup } = harness();
     navigator.begin("Abre IMDb", [imdb]);

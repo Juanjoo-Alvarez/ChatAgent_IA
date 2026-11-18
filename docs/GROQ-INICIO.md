@@ -48,8 +48,9 @@ misma configuración. Las claves de TMDB y Google Books permanecen en MCP.
 ## Prueba real y evals
 
 Probar una recomendación natural, una búsqueda concreta, una comparación y la
-apertura de referencias. El catálogo verificado continúa limitado a Dune (2021);
-el cambio de modelo no amplía esa evidencia ni garantiza calidad o latencia.
+apertura de referencias. El catálogo verificado incluye Dune (2021) y
+The Hunger Games (2012). El cambio de modelo no amplía esa evidencia ni
+garantiza calidad o latencia.
 
 ```powershell
 $env:RUN_LIVE_EVALS = '1'
@@ -61,9 +62,17 @@ en `evals/results/`. Los 30 casos requieren revisión humana. Las evals son
 secuenciales; pueden exceder la cuota gratuita y los errores no cuentan como
 éxitos funcionales. Se mantiene un plazo de 60 segundos por caso.
 
-El adaptador reintenta HTTP 429 una sola vez cuando `Retry-After` indica una
-espera de hasta 30 segundos, respetando la cancelación. Si la cuota continúa
-agotada, devuelve `rate_limited`; consultar la cuota en la consola.
+El adaptador reintenta HTTP 429 hasta dos veces cuando `Retry-After` indica una
+espera de hasta 30 segundos por respuesta, respetando la cancelación y el tiempo
+máximo del turno. Añade un pequeño margen al plazo indicado para evitar reintentar
+justo antes de que se libere la ventana. Si el límite sigue activo o una espera
+supera 30 segundos, devuelve
+`rate_limited`. La API registra `groq_rate_limited` con la espera y los
+contadores restantes; nunca registra la clave, el cuerpo de la solicitud ni el
+mensaje de error del proveedor. `remainingRequests` corresponde a solicitudes
+por día y `remainingTokens` a tokens por minuto según Groq. Un 429 puede deberse
+también a otro límite, como solicitudes por minuto; consulta los límites exactos
+en la consola de Groq. El widget muestra un límite temporal y permite reintentar.
 
 Si Groq devuelve HTTP 400 con código `tool_use_failed`, solicita una sola
 corrección al modelo. Esto cubre llamadas como `year: null`: el esquema requiere

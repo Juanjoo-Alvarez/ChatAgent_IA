@@ -90,7 +90,8 @@ desactivados. No ejecutarlo en paralelo con pruebas de carga.
 
 ## Límites y entrega al grupo
 
-El catálogo de adaptaciones verificadas cubre Dune (2021); otros casos pueden
+El catálogo de adaptaciones verificadas cubre Dune (2021) y The Hunger Games
+(2012), con fuentes de Scholastic, Lionsgate y Google Books; otros casos pueden
 devolver coincidencia posible o evidencia insuficiente. La ausencia de una
 asociación no demuestra que no exista adaptación. Se deben revisar fuentes
 antes de ampliar el catálogo.

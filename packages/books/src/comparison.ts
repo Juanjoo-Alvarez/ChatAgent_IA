@@ -13,9 +13,28 @@ const productionSource = "https://bfidatadigipres.github.io/previews/2021/10/05/
 export const VERIFIED_ADAPTATIONS = [{
   movieId: 438631, movieYear: 2021, movieTitle: "Dune", author: "Frank Herbert", originalYear: 1965,
   bookTitles: ["Dune", "Dune (Movie Tie-In)", "Dune (Movie Tie-In)."],
+  relationshipReason: "La fuente del productor identifica la novela y su autor; coinciden la película, el año, el título bibliográfico y el autor.",
   sources: [source, novelSource, publicationSource, productionSource],
   similarities: [{ text: "Ambas obras siguen a Paul Atreides y el conflicto en el planeta desértico Arrakis.", sources: [source, novelSource] }],
   differences: [{ text: "La adaptación de 2021 divide la novela en varias películas, por lo que esta entrega no abarca toda la obra. Las notas de producción documentan esa decisión de estructura.", sources: [productionSource] }]
+}, {
+  movieId: 70160, movieYear: 2012, movieTitle: "The Hunger Games", author: "Suzanne Collins", originalYear: 2008,
+  bookTitles: ["The Hunger Games", "The Hunger Games: Movie Tie-In Edition", "Los juegos del hambre"],
+  relationshipReason: "La editorial y la distribuidora identifican la película de 2012 como adaptación de la novela de Suzanne Collins; coinciden el título, el año de la película y la autora del libro.",
+  sources: [
+    "https://www.scholastic.com/newsroom/all-news/press-release/lionsgate--feasts-on-the-hunger-games.html",
+    "https://www.scholastic.com/newsroom/all-news/press-release/lionsgate-joins-scribd--donorschoose-org--and-scholastic-for--th.html",
+    "https://books.google.com/books/about/The_Hunger_Games.html?id=v7SzRTH5mwgC",
+    "https://www.scholastic.com/content/dam/newsroom/press-kit/hunger-games/Suzanne%20Collins%20QA%20no%20contact.pdf"
+  ],
+  similarities: [{
+    text: "La novela y su adaptación siguen a Katniss Everdeen en los Juegos de Panem.",
+    sources: ["https://books.google.com/books/about/The_Hunger_Games.html?id=v7SzRTH5mwgC", "https://www.scholastic.com/newsroom/all-news/press-release/lionsgate-joins-scribd--donorschoose-org--and-scholastic-for--th.html"]
+  }],
+  differences: [{
+    text: "Suzanne Collins explica que la película condensa la novela y debe dramatizar la vida interior de Katniss, narrada en primera persona en el libro.",
+    sources: ["https://www.scholastic.com/content/dam/newsroom/press-kit/hunger-games/Suzanne%20Collins%20QA%20no%20contact.pdf"]
+  }]
 }] as const;
 const canonical = (text: string): string => text.normalize("NFKC").trim().toLocaleLowerCase("en");
 
@@ -26,7 +45,8 @@ export function compareMovieBook(movie: Movie, rawBook: Book, rawPreferences: z.
   const evidence = VERIFIED_ADAPTATIONS.find((record) => record.movieId === movie.id
     && record.movieYear === movie.year && canonical(movie.original_title ?? movie.title ?? "") === canonical(record.movieTitle)
     && record.bookTitles.some((value) => canonical(value) === title)
-    && book.authors.length === 1 && canonical(book.authors[0] ?? "") === canonical(record.author)
+    && book.authors.some((author) => canonical(author) === canonical(record.author))
+    && !/graphic novel|novela gr[aá]fica|c[oó]mic|adapted by/i.test(`${book.title ?? ""} ${book.description ?? ""}`)
     && !book.provenance.suspected_instructions);
   const editionYear = /^(\d{4})(?:-|$)/.exec(book.published_date ?? "")?.[1];
   const dateConflict = evidence !== undefined && editionYear !== undefined && Number(editionYear) < evidence.originalYear;
@@ -34,7 +54,7 @@ export function compareMovieBook(movie: Movie, rawBook: Book, rawPreferences: z.
   const titleMatch = title.length > 0 && [movie.title, movie.original_title].some((value) => value !== null && canonical(value) === title);
   const status = confirmed ? "adaptation_identified" : titleMatch ? "possible_match" : "insufficient_evidence";
   const reasons = confirmed
-    ? ["La fuente del productor identifica la novela y su autor; coinciden la película, el año, el título bibliográfico y el autor."]
+    ? [evidence.relationshipReason]
     : ["Los metadatos recuperados no bastan para confirmar una adaptación."];
   if (dateConflict) { reasons.push("La fecha bibliográfica contradice el año original documentado; verifica la edición."); }
   if (!confirmed && titleMatch) { reasons.push("El título coincide, pero esa coincidencia no prueba una adaptación."); }
@@ -72,6 +92,7 @@ export function compareMovieBook(movie: Movie, rawBook: Book, rawPreferences: z.
     differences: confirmed ? evidence.differences : [],
     recommendation: { verdict, reasons: recommendationReasons }, limitations,
     sources: [...new Set([book.url, movie.tmdb_url, ...(confirmed ? evidence.sources : [])])],
-    references: [book.reference], book, movie_id: movie.id
+    references: [book.reference], book, movie_id: movie.id,
+    movie: { id: movie.id, title: movie.title, year: movie.year, poster: movie.poster, imdb_id: movie.imdb_id }
   });
 }
