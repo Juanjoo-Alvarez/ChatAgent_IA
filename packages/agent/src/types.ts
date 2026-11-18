@@ -58,6 +58,7 @@ export interface ConversationTurn {
   readonly user: string;
   readonly assistant: string;
   readonly references: readonly Reference[];
+  readonly movies?: readonly MovieCard[];
   readonly context?: EvidenceContext;
 }
 export interface AgentReply {

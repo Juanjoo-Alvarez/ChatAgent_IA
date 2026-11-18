@@ -1,4 +1,4 @@
-import type { MovieCard, Reference } from "@agichat/protocol";
+import { referenceScope, type MovieCard, type Reference } from "@agichat/protocol";
 
 import { collectEvidence, isPromptAttack, safeOutput, SYSTEM_PROMPT } from "./policy.js";
 import { resolveReferenceRequest } from "./references.js";
@@ -22,20 +22,22 @@ function withReferenceLabels(known: readonly Reference[], movies: readonly Movie
 }
 
 function referenceClarification(content: string, known: readonly Reference[]): string {
-  const imdb = /\bIMDb\b/i.test(content);
-  const books = /Google\s+Books/i.test(content);
-  if (imdb === books) { return "Pide abrir IMDb o Google Books por separado e indica una obra concreta."; }
-  const provider = imdb ? "imdb" : "google-books";
+  const destinations = [
+    { provider: "imdb", name: "IMDb", matches: /\b(?:IMDb|IMBD)\b/i.test(content) },
+    { provider: "google-books", name: "Google Books", matches: /Google\s*Books/i.test(content) }
+  ];
+  const requested = destinations.filter((entry) => entry.matches);
+  if (requested.length !== 1) { return "Pide abrir IMDb o Google Books por separado e indica una obra concreta."; }
+  const { provider, name } = requested[0]!;
   const matches = known.filter((reference) => reference.provider === provider);
   if (matches.length === 0) {
-    return imdb
-      ? "Todavía no tengo una referencia de IMDb. Pide los detalles de una película concreta primero."
-      : "Todavía no tengo una referencia de Google Books. Primero busca y compara un libro concreto.";
+    return provider === "google-books"
+      ? "Todavía no tengo una referencia de Google Books. Primero busca y compara un libro concreto."
+      : `Todavía no tengo una referencia de ${name}. Pide los detalles de una película concreta primero.`;
   }
   const labels = matches.map((reference) => reference.label);
   const unique = (label: string | undefined) => label !== undefined && labels.filter((value) => value?.toLocaleLowerCase("es") === label.toLocaleLowerCase("es")).length === 1;
   const choices = matches.slice(0, 5).map((reference) => unique(reference.label) ? reference.label : `${reference.label ?? "Referencia"} (${reference.id})`);
-  const name = imdb ? "IMDb" : "Google Books";
   const example = matches.find((reference) => unique(reference.label));
   const command = example === undefined ? `Abre ${name} ${matches[0]!.id}` : `Abre ${name} de ${example.label}`;
   return `Hay ${matches.length > 1 ? "varias obras" : "una obra"} con referencia de ${name}. Elige una por nombre, por ejemplo «${command}». Opciones: ${choices.join("; ")}.`;
@@ -214,7 +216,7 @@ export class MovieAgent implements ChatAgent {
       for (const reference of turn.references) { references.set(`${reference.provider}:${reference.id}`, reference); }
     }
     const knownReferences = withReferenceLabels([...references.values()], context.movies, context);
-    const navigation = resolveReferenceRequest(input.content, knownReferences, input.openReference);
+    const navigation = resolveReferenceRequest(input.content, knownReferences, input.openReference, referenceScope(input.history));
     if (navigation.requested) {
       const reference = navigation.reference;
       if (reference === null) {

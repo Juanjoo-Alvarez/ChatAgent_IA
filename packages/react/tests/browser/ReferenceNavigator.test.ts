@@ -23,7 +23,8 @@ describe("ReferenceNavigator", () => {
     ["Por favor, abre Google Books", book, "https://books.google.com/books?id=volume_1"],
     ["¿Puedes abrir IMDb?", imdb, "https://www.imdb.com/title/tt1234567/"],
     ["¿Podrías abrir Google Books?", book, "https://books.google.com/books?id=volume_1"],
-    ["Can you open IMDb?", imdb, "https://www.imdb.com/title/tt1234567/"]
+    ["Can you open IMDb?", imdb, "https://www.imdb.com/title/tt1234567/"],
+    ["Abre IMDb de eso", imdb, "https://www.imdb.com/title/tt1234567/"]
   ] as const)("opens only the expected destination for %s", (text, reference, url) => {
     const { navigator, popup, open } = harness();
     navigator.begin(text, [reference, reference]);
@@ -44,6 +45,18 @@ describe("ReferenceNavigator", () => {
     navigator.begin("Abre IMDb tt1234567", [imdb, { ...imdb, id: "tt7654321" }]);
     expect(open).toHaveBeenCalledOnce();
     navigator.finish();
+  });
+  it("reserves the current book despite older references and keeps it available after opening IMDb", () => {
+    const { navigator, open, popup } = harness();
+    const oldBook = { ...book, id: "Old" };
+    const known = [oldBook, book, imdb];
+    navigator.begin("Abre IMDb de eso", known, [book, imdb]);
+    navigator.accept(action(imdb, "imdb"));
+    navigator.begin("Abre Google Books del libro que mencionaste", known, [book, imdb]);
+    navigator.accept(action(book, "book"));
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(popup.location.replace.mock.calls).toEqual([["https://www.imdb.com/title/tt1234567/"], ["https://books.google.com/books?id=volume_1"]]);
+    expect(popup.close).not.toHaveBeenCalled();
   });
   it("reserves a tab for a movie selected by its visible name", () => {
     const { navigator, popup, open } = harness();

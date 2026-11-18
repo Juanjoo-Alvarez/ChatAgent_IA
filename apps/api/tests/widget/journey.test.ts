@@ -7,6 +7,48 @@ import { cleanupWidgets, mountClient, send, text, widgetServer } from "./harness
 afterEach(cleanupWidgets);
 
 describe("Public widget connected to HTTP/WebSocket API", () => {
+  it("opens IMDb and the current book across recommendations, without another model call or a link click", async () => {
+    const first = { id: 150, title: "Costa lejana", year: 2014, poster: null, imdb_id: "tt9950150" };
+    const second = { ...first, id: 151, title: "Mar abierto", year: 2020, imdb_id: "tt9950151" };
+    const call = vi.fn(async (request) => {
+      if (request.name === "recommend_movies") { return { isError: false, data: { candidates: [first, second] } }; }
+      const movie = request.arguments.movie_id === first.id ? first : second;
+      const book = { id: `Book_${movie.id}`, title: `Libro de ${movie.title}`, authors: ["Autora"] };
+      return { isError: false, data: { status: "adaptation_identified", movie, book,
+        sources: ["https://www.wikidata.org/wiki/Q123"], references: [{ provider: "google-books", id: book.id }] } };
+    });
+    const complete = vi.fn(async () => { throw new Error("Navigation must not use a model"); });
+    const gateway: ToolGateway = { open: vi.fn(async () => ({ call, close: vi.fn(async () => undefined), tools: [
+      { name: "recommend_movies", description: "", inputSchema: { type: "object" } },
+      { name: "compare_movie_book", description: "", inputSchema: { type: "object", properties: { movie_id: { type: "integer" }, book_id: { type: "string" } }, required: ["movie_id"] } }
+    ] })) };
+    const api = await widgetServer(new MovieAgent({ complete }, gateway));
+    const { host } = await mountClient(api.base);
+    const popups = Array.from({ length: 5 }, () => ({ opener: {}, closed: false, close: vi.fn(), location: { replace: vi.fn() } }));
+    const open = vi.spyOn(window, "open");
+    for (const popup of popups) { open.mockReturnValueOnce(popup as unknown as Window); }
+    await send(host, "Recomiéndame una película de acción");
+    await text(host, "Te recomiendo Costa lejana");
+    await send(host, "¿Está basada en un libro?");
+    await text(host, "La evidencia consultada identifica esta adaptación");
+    await send(host, "Abre IMDb de eso");
+    await vi.waitFor(() => expect(popups[0]!.location.replace).toHaveBeenCalledWith("https://www.imdb.com/title/tt9950150/"));
+    await send(host, "Abre Google Books del libro que mencionaste");
+    await vi.waitFor(() => expect(popups[1]!.location.replace).toHaveBeenCalledWith("https://books.google.com/books?id=Book_150"));
+    await send(host, "Dame otra");
+    await text(host, "Te recomiendo Mar abierto");
+    await send(host, "¿Está basada en un libro?");
+    await vi.waitFor(() => expect(call).toHaveBeenCalledWith({ name: "compare_movie_book", arguments: { movie_id: 151 } }, expect.any(AbortSignal)));
+    await send(host, "Abre Google Books de ese libro");
+    await vi.waitFor(() => expect(popups[2]!.location.replace).toHaveBeenCalledWith("https://books.google.com/books?id=Book_151"));
+    await send(host, "Abre IMDb");
+    await vi.waitFor(() => expect(popups[3]!.location.replace).toHaveBeenCalledWith("https://www.imdb.com/title/tt9950151/"));
+    await send(host, "Abre Google Books");
+    await vi.waitFor(() => expect(popups[4]!.location.replace).toHaveBeenCalledWith("https://books.google.com/books?id=Book_151"));
+    expect(open).toHaveBeenCalledTimes(5);
+    expect(complete).not.toHaveBeenCalled();
+    expect(popups.every((popup) => popup.opener === null && popup.close.mock.calls.length === 0)).toBe(true);
+  });
   it("runs the actual Groq adapter and agent through comparison and navigation with mocked external services", async () => {
     const movie = { id: 438631, title: "Dune", year: 2021, poster: "https://image.tmdb.org/t/p/w500/dune.jpg", imdb_id: "tt1160419" };
     const book = { id: "Dune_Book", title: "Dune", authors: ["Frank Herbert", "Editor"] };

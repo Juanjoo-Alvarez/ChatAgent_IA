@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
 import { AgentError, resolveReferenceRequest, type ChatAgent } from "@agichat/agent";
-import { CAPABILITY_NOTICE, parseClientFrame, serverFrameSchema, type ErrorCode, type ServerFrame, type UserMessageFrame } from "@agichat/protocol";
+import { CAPABILITY_NOTICE, parseClientFrame, referenceScope, serverFrameSchema, type ErrorCode, type ServerFrame, type UserMessageFrame } from "@agichat/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 
 import type { ApiConfig } from "./config.js";
@@ -110,11 +110,12 @@ export function createChatServer(config: ApiConfig, agent: ChatAgent, store: Ses
         send({ version: 1, type: "agent-typing", requestId: frame.requestId, isTyping: true });
         const reply = await abortable(agent.respond({
           content: frame.content,
-          history: session.turns.map((turn) => ({ user: turn.user, assistant: turn.frame.message.content, references: turn.frame.references, ...(turn.context === undefined ? {} : { context: turn.context }) })),
+          history: session.turns.map((turn) => ({ user: turn.user, assistant: turn.frame.message.content, references: turn.frame.references, movies: turn.frame.movies, ...(turn.context === undefined ? {} : { context: turn.context }) })),
           ...(frame.openReference === undefined ? {} : { openReference: frame.openReference }), signal
         }), signal);
         signal.throwIfAborted();
-        const navigation = resolveReferenceRequest(frame.content, session.turns.flatMap((turn) => turn.frame.references), frame.openReference);
+        const history = session.turns.map((turn) => ({ user: turn.user, references: turn.frame.references, movies: turn.frame.movies }));
+        const navigation = resolveReferenceRequest(frame.content, history.flatMap((turn) => turn.references), frame.openReference, referenceScope(history));
         if (reply.actions.some((action) => navigation.reference === null
           || action.reference.provider !== navigation.reference.provider || action.reference.id !== navigation.reference.id)) {
           throw new AgentError("policy_denied");
