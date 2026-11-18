@@ -33,7 +33,7 @@ export function loadApiConfig(env: Readonly<Record<string, string | undefined>>)
   const sessionStore = env.SESSION_STORE ?? "memory";
   if (mode !== "ollama" && mode !== "groq" && mode !== "fixture") { throw new Error("Invalid AGENT_MODE"); }
   const groqApiKey = env.GROQ_API_KEY?.trim() ?? "";
-  const groqModel = env.GROQ_MODEL?.trim() ?? "openai/gpt-oss-20b";
+  const groqModel = env.GROQ_MODEL?.trim() ?? "openai/gpt-oss-120b";
   if (mode === "groq" && !groqApiKey) { throw new Error("GROQ_API_KEY is required"); }
   if (!groqModel || groqModel.length > 100) { throw new Error("Invalid GROQ_MODEL"); }
   if (toolsMode !== "mcp" && toolsMode !== "fixture") { throw new Error("Invalid TOOLS_MODE"); }

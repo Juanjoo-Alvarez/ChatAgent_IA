@@ -43,3 +43,31 @@ de adaptaciones verificadas, que actualmente cubre Dune (2021).
 Las pruebas automatizadas verifican reducción de contexto, conservación de datos,
 errores, cierre de MCP y límites de herramientas. La calidad del modelo debe
 comprobarse además con peticiones reales y revisión humana.
+
+## Comparación de modelos Groq
+
+Prueba manual del 18/11/2026 con las mismas dos peticiones, MCP con TMDB y
+Google Books habilitados, y el plan gratuito de Groq (8000 tokens por minuto
+para los tres modelos). Una sola ejecución por caso: no es un benchmark.
+
+| Modelo | «Recomiéndame una película de ciencia ficción» | «Compara la película Dune de 2021 con el libro de Frank Herbert» |
+|---|---|---|
+| Ollama `qwen3:4b-instruct-2507-q4_K_M` (local, GPU parcial) | 57 s | 158 s, completa |
+| `openai/gpt-oss-20b` | 2,8 s | Falla: inventó el ID `11322`, repitió `search_movies("Dune 2021")` y agotó los 5 pasos (`limit_exceeded`) |
+| `openai/gpt-oss-120b` | 32 s | 21–30 s, completa con IDs correctos (`438631`, `JhJ7cgAACAAJ`) |
+| `qwen/qwen3.8-27b` | 4 s | 58 s, completa |
+
+La mayor parte del tiempo en Groq corresponde a esperas por la cuota de tokens
+por minuto, no a la inferencia: cada paso reenvía instrucciones, las seis
+herramientas y los resultados acumulados. Ejecutar turnos consecutivos puede
+devolver `rate_limited`.
+
+Por eso el valor predeterminado pasa a `openai/gpt-oss-120b`. Observaciones de
+calidad que requieren revisión humana:
+
+- `gpt-oss-20b` afirmó fidelidad de una adaptación sin llamar a
+  `compare_movie_book`.
+- `gpt-oss-120b` añadió detalles no respaldados por las herramientas (por
+  ejemplo, «religión del agua» o «espectacularidad visual»).
+- `qwen3.8-27b` fue el más prudente con la evidencia, pero consumió más contexto
+  y esperó más por la cuota en la comparación.
