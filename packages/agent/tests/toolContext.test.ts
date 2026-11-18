@@ -26,10 +26,13 @@ describe("bounded tool context", () => {
     vi.mocked(f.gateway.open).mockResolvedValue(session);
     vi.mocked(session.call).mockResolvedValue({ isError, data: { status: "adaptation_identified", movie,
       references: [{ provider: "google-books", id: "book" }] } });
-    const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Compara", history: [], signal: signal() });
+    const operation = new MovieAgent(f.model, f.gateway).respond({ content: "Compara", history: [], signal: signal() });
+    if (isError) {
+      await expect(operation).rejects.toMatchObject({ code: "unavailable" });
+    } else {
+      expect((await operation).movies[0]?.poster).toBe(movie.poster);
+    }
     expect(vi.mocked(f.model.complete).mock.calls[1]?.[1]).toEqual(isError ? tools : []);
-    expect(reply.movies).toHaveLength(isError ? 0 : 1);
-    if (!isError) { expect(reply.movies[0]?.poster).toBe(movie.poster); }
     expect(session.close).toHaveBeenCalledOnce();
   });
   it("rejects further tool calls when only final text was requested", async () => {

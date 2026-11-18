@@ -12,8 +12,9 @@ const responseSchema = z.object({
 export class OllamaModel implements LanguageModel {
   public constructor(private readonly options: { readonly url: string; readonly model: string; readonly fetch?: typeof fetch }) {}
 
-  public async complete(messages: readonly ModelMessage[], tools: readonly ToolDefinition[], signal: AbortSignal) {
+  public async complete(messages: readonly ModelMessage[], tools: readonly ToolDefinition[], signal: AbortSignal, onInference?: () => void) {
     signal.throwIfAborted();
+    onInference?.();
     const response = await (this.options.fetch ?? fetch)(new URL("/api/chat", this.options.url), {
       method: "POST", headers: { "Content-Type": "application/json" }, signal,
       body: JSON.stringify({

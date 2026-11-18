@@ -13,7 +13,7 @@ import {
   type RedisLike
 } from "@agichat/external-api";
 import { TMDB_QUOTA_PROVIDER, TmdbClient } from "@agichat/tmdb";
-import { GoogleBooksClient } from "@agichat/books";
+import { GoogleBooksClient, WikidataAdaptationCatalog } from "@agichat/books";
 
 import type { ServerConfig } from "./config.js";
 import { createMcpHttpServer } from "./http.js";
@@ -104,11 +104,12 @@ export function createApplication(config: ServerConfig, dependencies: Applicatio
     quota, cache: cacheStore, apiKey: config.books.apiKey, timeoutMs: config.books.timeoutMs,
     fetch: dependencies.fetch, retry: dependencies.retry
   });
+  const adaptations = books === undefined ? undefined : new WikidataAdaptationCatalog({ quota, cache: cacheStore, fetch: dependencies.fetch });
   const httpServer = createMcpHttpServer({
     path: config.path,
     allowedHosts: config.allowedHosts,
     logger,
-    createMcpServer: () => createMcpServer({ movies: tmdb, logger, ...(books === undefined ? {} : { books }) })
+    createMcpServer: () => createMcpServer({ movies: tmdb, logger, ...(books === undefined ? {} : { books, adaptations }) })
   });
 
   return {

@@ -21,7 +21,7 @@ describe("Groq inference", () => {
   it("completes a real agent loop with correlated tool IDs, evidence and MCP cleanup", async () => {
     const f = fixtures();
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(response(null, [tool])).mockResolvedValueOnce(response("Te recomiendo Marea alta."));
-    const reply = await new MovieAgent(modelWith(fetchImpl), f.gateway).respond({ content: "Recomienda", history: [], signal: signal() });
+    const reply = await new MovieAgent(modelWith(fetchImpl), f.gateway).respond({ content: "Busca Marea alta", history: [], signal: signal() });
     expect(reply.movies[0]?.poster).toBe(movie.poster);
     expect(f.session.call).toHaveBeenCalledWith({ id: "call_123", name: "recommend_movies", arguments: {} }, expect.any(AbortSignal));
     expect(f.session.close).toHaveBeenCalledOnce();
@@ -55,7 +55,9 @@ describe("Groq inference", () => {
     expect(f.session.close).toHaveBeenCalledOnce();
     const initial = JSON.parse(fetchImpl.mock.calls[0]![1]!.body as string);
     const retried = JSON.parse(fetchImpl.mock.calls[1]![1]!.body as string);
-    expect(retried).toEqual({ ...initial, messages: [...initial.messages, { role: "system", content: expect.stringContaining("no envíes null") }] });
+    expect(retried).toEqual({ ...initial, messages: [
+      { role: "system", content: expect.stringContaining(`${initial.messages[0].content}\nLa llamada anterior`) }, ...initial.messages.slice(1)
+    ] });
     expect(initial.messages).toEqual(expect.arrayContaining([
       { role: "user", content: history[0]!.user }, { role: "assistant", content: history[0]!.assistant },
       { role: "user", content: "¿Hay alguna de deportes?" }
@@ -86,8 +88,8 @@ describe("Groq inference", () => {
   it("preserves cancellation during a tool correction", async () => {
     const controller = new AbortController();
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(toolFailure()).mockImplementationOnce(async (_url, init) => {
-      expect(init?.signal).toBe(controller.signal);
       controller.abort();
+      expect(init?.signal?.aborted).toBe(true);
       throw new Error("private");
     });
     await expect(modelWith(fetchImpl).complete([], fixtures().session.tools, controller.signal)).rejects.toMatchObject({ name: "AbortError" });
@@ -126,26 +128,19 @@ describe("Groq inference", () => {
     const result = modelWith(fetchImpl).complete([], [], signal());
     if (status === 200) { expect((await result).content).toBe("Hola"); }
     else { await expect(result).rejects.toMatchObject({ code: "rate_limited" }); }
-    expect(fetchImpl).toHaveBeenCalledTimes(status === 200 ? 2 : 3);
-  });
-  it("recovers after two consecutive short rate limits", async () => {
-    const fetchImpl = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(new Response("", { status: 429, headers: { "retry-after": "0" } }))
-      .mockResolvedValueOnce(new Response("", { status: 429, headers: { "retry-after": "0" } }))
-      .mockResolvedValueOnce(response("Hola"));
-    expect((await modelWith(fetchImpl).complete([], [], signal())).content).toBe("Hola");
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
-  });
-  it("waits for a provider delay longer than two seconds before retrying", async () => {
-    const fetchImpl = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(new Response("", { status: 429, headers: { "retry-after": "2.1" } }))
-      .mockResolvedValueOnce(response("Hola"));
-    expect((await modelWith(fetchImpl).complete([], [], signal())).content).toBe("Hola");
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+  it("returns long rate limits promptly and shares the cooldown across turns", async () => {
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("", { status: 429, headers: { "retry-after": "2.1" } }));
+    const model = modelWith(fetchImpl);
+    await expect(model.complete([], [], signal())).rejects.toMatchObject({ code: "rate_limited" });
+    await expect(model.complete([], [], signal())).rejects.toMatchObject({ code: "rate_limited" });
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
   it("cancels the quota wait without sending another request", async () => {
     const controller = new AbortController();
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response("", { status: 429, headers: { "retry-after": "5" } }));
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response("", { status: 429, headers: { "retry-after": "1" } }));
     const pending = modelWith(fetchImpl).complete([], [], controller.signal);
     const rejected = expect(pending).rejects.toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -197,11 +192,27 @@ describe("Groq inference", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(fetchImpl.mock.calls[1]![1]!.body).not.toContain("Inventado");
   });
-  it("corrects a rejected tool call after one rate-limit wait", async () => {
+  it("uses one shared retry allowance for rate limits and tool corrections", async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response("", { status: 429, headers: { "retry-after": "0" } }))
       .mockResolvedValueOnce(toolFailure()).mockResolvedValueOnce(response("Hola"));
-    expect((await modelWith(fetchImpl).complete([], fixtures().session.tools, signal())).content).toBe("Hola");
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    await expect(modelWith(fetchImpl).complete([], fixtures().session.tools, signal())).rejects.toMatchObject({ code: "unavailable" });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+  it("caps inference time independently of the turn so MCP recovery still has time", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (_url, init) => {
+      const deadline = init!.signal!;
+      return await new Promise<Response>((_resolve, reject) => {
+        deadline.addEventListener("abort", () => reject(deadline.reason), { once: true });
+      });
+    });
+    const model = new GroqModel({ apiKey: "synthetic", model: "test", timeoutMs: 25, fetch: fetchImpl });
+    const f = fixtures();
+    const turn = signal();
+    const reply = await new MovieAgent(model, f.gateway).respond({ content: "Recomiéndame una película", history: [], signal: turn });
+    expect(turn.aborted).toBe(false);
+    expect(reply.movies[0]?.id).toBe(movie.id);
+    expect(f.session.call).toHaveBeenCalledOnce();
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
   it("rejects unoffered tools, duplicate IDs, empty completions and repeated truncation after two attempts", async () => {
     for (const make of [() => response(null, [tool]), () => response(null, [tool, tool]), () => response(""),

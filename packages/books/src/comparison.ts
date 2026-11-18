@@ -1,6 +1,7 @@
 import type { Movie } from "@agichat/tmdb";
 import type { z } from "zod";
 import { bookSchema, comparisonSchema, preferencesSchema, type Book } from "./schemas.js";
+import type { AdaptationEvidence } from "./AdaptationCatalog.js";
 
 const source = "https://www.legendary.com/legendary-comics-announces-the-official-graphic-novel-adaptation-of-denis-villeneuves-epic-film-dune/";
 const novelSource = "https://www.legendary.com/legendary-entertainment-acquires-rights-to-frank-herberts-classic-sci-fi-novel-dune/";
@@ -38,7 +39,15 @@ export const VERIFIED_ADAPTATIONS = [{
 }] as const;
 const canonical = (text: string): string => text.normalize("NFKC").trim().toLocaleLowerCase("en");
 
-export function compareMovieBook(movie: Movie, rawBook: Book, rawPreferences: z.input<typeof preferencesSchema> = {}) {
+const bibliographicKey = (value: string): string => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]/gu, "");
+export function matchesAdaptation(book: Book, evidence: AdaptationEvidence): boolean {
+  return book.title !== null && !book.provenance.suspected_instructions
+    && !/graphic novel|novela gr[aá]fica|c[oó]mic|study guide|gu[ií]a de estudio|adapted by/i.test(`${book.title} ${book.description ?? ""}`)
+    && evidence.titles.some((title) => bibliographicKey(title) === bibliographicKey(book.title!.replace(/\s*\((?:movie tie-in|film tie-in|.*edition)\)\.?$/i, "")))
+    && evidence.authors.some((author) => book.authors.some((candidate) => bibliographicKey(candidate) === bibliographicKey(author)));
+}
+
+export function compareMovieBook(movie: Movie, rawBook: Book, rawPreferences: z.input<typeof preferencesSchema> = {}, associations: readonly AdaptationEvidence[] = []) {
   const book = bookSchema.parse(rawBook);
   const preferences = preferencesSchema.parse(rawPreferences);
   const title = canonical(book.title ?? "");
@@ -48,20 +57,23 @@ export function compareMovieBook(movie: Movie, rawBook: Book, rawPreferences: z.
     && book.authors.some((author) => canonical(author) === canonical(record.author))
     && !/graphic novel|novela gr[aá]fica|c[oó]mic|adapted by/i.test(`${book.title ?? ""} ${book.description ?? ""}`)
     && !book.provenance.suspected_instructions);
+  const association = associations.find((record) => record.movieId === movie.id && record.sources.length > 0
+    && record.sources.every((url) => /^https:\/\/www\.wikidata\.org\/wiki\/Q[1-9]\d*$/.test(url)) && matchesAdaptation(book, record));
   const editionYear = /^(\d{4})(?:-|$)/.exec(book.published_date ?? "")?.[1];
-  const dateConflict = evidence !== undefined && editionYear !== undefined && Number(editionYear) < evidence.originalYear;
-  const confirmed = evidence !== undefined && !dateConflict;
+  const originalYear = evidence?.originalYear ?? association?.originalYear;
+  const dateConflict = originalYear !== undefined && editionYear !== undefined && Number(editionYear) < originalYear;
+  const confirmed = (evidence !== undefined || association !== undefined) && !dateConflict;
   const titleMatch = title.length > 0 && [movie.title, movie.original_title].some((value) => value !== null && canonical(value) === title);
   const status = confirmed ? "adaptation_identified" : titleMatch ? "possible_match" : "insufficient_evidence";
   const reasons = confirmed
-    ? [evidence.relationshipReason]
+    ? [evidence?.relationshipReason ?? `Wikidata vincula esta película de TMDB con «${book.title}» de ${association!.authors.join(", ")}; el título y el autor coinciden con Google Books.`]
     : ["Los metadatos recuperados no bastan para confirmar una adaptación."];
   if (dateConflict) { reasons.push("La fecha bibliográfica contradice el año original documentado; verifica la edición."); }
   if (!confirmed && titleMatch) { reasons.push("El título coincide, pero esa coincidencia no prueba una adaptación."); }
   const limitations = [
     "La fecha de Google Books corresponde a la edición recuperada, no necesariamente a la publicación original.",
     "No se ha verificado fidelidad escena por escena ni capítulo por capítulo.",
-    "El catálogo de asociaciones verificadas es limitado: ausencia de evidencia no significa ausencia de adaptación."
+    "Las fuentes consultadas pueden ser incompletas: ausencia de evidencia no significa ausencia de adaptación."
   ];
   if (book.description === null) { limitations.push("El libro no tiene descripción disponible."); }
   if (book.provenance.suspected_instructions || movie.provenance.suspected_instruction_fields.length > 0) {
@@ -88,10 +100,11 @@ export function compareMovieBook(movie: Movie, rawBook: Book, rawPreferences: z.
     }
   } else { recommendationReasons.push("Confirma primero la adaptación; no es posible evaluar su relación con este libro."); }
   return comparisonSchema.parse({
-    status, reasons, similarities: confirmed ? evidence.similarities : [],
-    differences: confirmed ? evidence.differences : [],
+    status, reasons, similarities: confirmed ? evidence?.similarities ?? [] : [],
+    differences: confirmed ? evidence?.differences ?? [{ text: `Puedes contrastar la sinopsis de la película con la descripción bibliográfica de «${book.title}». La asociación confirma la obra de origen; no demuestra qué escenas se cambiaron.`, sources: [...association!.sources] }] : [],
     recommendation: { verdict, reasons: recommendationReasons }, limitations,
-    sources: [...new Set([book.url, movie.tmdb_url, ...(confirmed ? evidence.sources : [])])],
+    ...(association !== undefined && evidence === undefined && confirmed ? { synopses: { movie: movie.overview, book: book.description } } : {}),
+    sources: [...new Set([book.url, movie.tmdb_url, ...(confirmed ? evidence?.sources ?? association!.sources : [])])],
     references: [book.reference], book, movie_id: movie.id,
     movie: { id: movie.id, title: movie.title, year: movie.year, poster: movie.poster, imdb_id: movie.imdb_id }
   });

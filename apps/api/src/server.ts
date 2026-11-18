@@ -69,9 +69,10 @@ export function createChatServer(config: ApiConfig, agent: ChatAgent, store: Ses
     let windowStart = Date.now();
     const disconnected = new AbortController();
     const send = (frame: ServerFrame) => { if (ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(serverFrameSchema.parse(frame))); } };
-    const error = (code: ErrorCode, requestId?: string) => send({
+    const provider = (source: AgentError["source"]) => source === "tmdb" ? "TMDB" : source === "google-books" ? "Google Books" : source === "wikidata" ? "Wikidata" : "Groq";
+    const error = (code: ErrorCode, requestId?: string, source?: AgentError["source"]) => send({
       version: 1, type: "error", ...(requestId === undefined ? {} : { requestId }), code,
-      message: ({ invalid_frame: "Mensaje inválido.", unauthorized: "Sesión no autorizada.", session_expired: "La sesión expiró.", busy: "Hay una solicitud en curso. Intenta nuevamente.", duplicate_request: "El identificador ya se utilizó para otra solicitud.", timeout: "La solicitud excedió el tiempo disponible.", cancelled: "Solicitud cancelada.", unavailable: "El servicio no está disponible temporalmente.", rate_limited: "Groq aplicó un límite de uso temporal. Intenta nuevamente más tarde.", policy_denied: "La operación no está permitida.", limit_exceeded: "La solicitud excedió los límites permitidos." })[code],
+      message: ({ invalid_frame: "Mensaje inválido.", unauthorized: "Sesión no autorizada.", session_expired: "La sesión expiró.", busy: "Hay una solicitud en curso. Intenta nuevamente.", duplicate_request: "El identificador ya se utilizó para otra solicitud.", timeout: source === undefined ? "La solicitud excedió el tiempo disponible." : `La consulta a ${provider(source)} excedió el tiempo disponible.`, cancelled: "Solicitud cancelada.", unavailable: source === undefined ? "El servicio no está disponible temporalmente." : `No se pudo completar la consulta a ${provider(source)}.`, rate_limited: `${provider(source)} aplicó un límite de uso temporal. Intenta nuevamente más tarde.`, policy_denied: "La operación no está permitida.", limit_exceeded: "La solicitud excedió los límites permitidos." })[code],
       retryable: ["busy", "timeout", "unavailable", "rate_limited"].includes(code)
     });
     const authTimer = setTimeout(() => { ws.close(1008, "Authentication required"); }, 5000);
@@ -89,18 +90,20 @@ export function createChatServer(config: ApiConfig, agent: ChatAgent, store: Ses
       const signal = AbortSignal.any([controller.signal, disconnected.signal]);
       const owner = randomUUID();
       let acquired = false;
+      let responseFrame: ServerFrame | undefined;
+      let failure: { code: ErrorCode; source?: AgentError["source"] } | undefined;
       const fingerprint = tokenHash(JSON.stringify([frame.content, frame.openReference ?? null]));
       try {
         acquired = await store.acquire(identity.id, identity.hash, owner, config.turnTimeoutMs + 5000);
         if (!acquired) {
-          error(await store.get(identity.id) === null ? "session_expired" : "busy", frame.requestId); return;
+          failure = { code: await store.get(identity.id) === null ? "session_expired" : "busy" }; return;
         }
         const session = await store.get(identity.id);
-        if (session === null) { error("session_expired", frame.requestId); return; }
+        if (session === null) { failure = { code: "session_expired" }; return; }
         const previous = session.turns.find((turn) => turn.requestId === frame.requestId);
         if (previous !== undefined) {
-          if (previous.fingerprint !== fingerprint) { error("duplicate_request", frame.requestId); }
-          else { send({ ...previous.frame, actions: [] }); }
+          if (previous.fingerprint !== fingerprint) { failure = { code: "duplicate_request" }; }
+          else { responseFrame = { ...previous.frame, actions: [] }; }
           return;
         }
         signal.throwIfAborted();
@@ -124,17 +127,22 @@ export function createChatServer(config: ApiConfig, agent: ChatAgent, store: Ses
         if (response.type !== "agent-message") { throw new Error("invalid_agent_response"); }
         const committed = await store.commit(identity.id, owner, { requestId: frame.requestId, fingerprint, user: frame.content, frame: response, ...(reply.context === undefined ? {} : { context: reply.context }) }, config.sessionTtlMs);
         signal.throwIfAborted();
-        if (!committed) { error("session_expired", frame.requestId); return; }
-        send(response);
+        if (!committed) { failure = { code: "session_expired" }; return; }
+        responseFrame = response;
       } catch (cause) {
         if (!disconnected.signal.aborted) {
-          error(signal.aborted ? (controller.signal.reason instanceof Error && controller.signal.reason.message === "timeout" ? "timeout" : "cancelled") : cause instanceof AgentError ? cause.code : "unavailable", frame.requestId);
+          failure = signal.aborted
+            ? { code: controller.signal.reason instanceof Error && controller.signal.reason.message === "timeout" ? "timeout" : "cancelled" }
+            : cause instanceof AgentError
+              ? { code: cause.code, ...(cause.source === undefined ? {} : { source: cause.source }) } : { code: "unavailable" };
         }
       } finally {
         clearTimeout(timeout);
         if (acquired) { await store.release(identity.id, owner).catch(() => undefined); }
         current = undefined;
         activeTurns -= 1;
+        if (responseFrame !== undefined) { send(responseFrame); }
+        if (failure !== undefined) { error(failure.code, frame.requestId, failure.source); }
         send({ version: 1, type: "agent-typing", requestId: frame.requestId, isTyping: false });
       }
     };

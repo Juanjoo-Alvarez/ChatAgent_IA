@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { MovieAgent, type ConversationTurn, type EvidenceContext } from "../src/index.js";
-import { groundedText, selectContext, updateContext } from "../src/grounding.js";
+import { AgentError, MovieAgent, type ConversationTurn, type EvidenceContext } from "../src/index.js";
+import { groundedText, selectContext, selectedMovieComparison, updateContext } from "../src/grounding.js";
 import { compactResult } from "../src/toolContext.js";
 import { fixtures, movie, recommendCall, signal } from "./helpers.js";
 
@@ -22,7 +22,7 @@ describe("MCP grounding regressions", () => {
     expect(reply.content).toContain("Te recomiendo Marea alta");
     expect(reply.content).not.toContain("inventado");
     expect(reply.movies).toEqual([card]);
-    expect(f.model.complete).toHaveBeenCalledTimes(2);
+    expect(f.model.complete).toHaveBeenCalledOnce();
     expect(f.session.call).toHaveBeenCalledOnce();
     expect(f.session.close).toHaveBeenCalledOnce();
   });
@@ -33,6 +33,27 @@ describe("MCP grounding regressions", () => {
     expect(reply.content).not.toContain("inventado");
     expect(reply.content).not.toContain("fiel");
     expect(f.session.call).toHaveBeenCalledOnce();
+  });
+  it("paginates only after using the verified candidates and excludes seen IDs", async () => {
+    const f = fixtures();
+    const next = { ...movie, id: 502, title: "Mar en calma", year: 2018, release_date: "2018-12-01" };
+    vi.mocked(f.session.call).mockResolvedValueOnce({ isError: false, data: { candidates: [{ ...movie, release_date: "2018-02-01" }], total_pages: 2 } })
+      .mockResolvedValueOnce({ isError: false, data: { candidates: [movie, next], total_pages: 2 } });
+    const agent = new MovieAgent(f.model, f.gateway);
+    const first = await agent.respond({ content: "Recomiéndame una película de acción", history: [], signal: signal() });
+    const second = await agent.respond({ content: "Dame otra", history: [{ user: "Recomienda acción", assistant: first.content, references: first.references, context: first.context! }], signal: signal() });
+    expect(second.movies[0]?.id).toBe(next.id);
+    expect(f.session.call).toHaveBeenCalledTimes(2);
+    expect(f.session.call).toHaveBeenLastCalledWith({ name: "recommend_movies", arguments: { genres: [28], genre_match: "any", page: 2 } }, expect.any(AbortSignal));
+    expect(f.model.complete).not.toHaveBeenCalled();
+  });
+  it("reports a recommendation provider error instead of treating it as an empty catalog", async () => {
+    const f = fixtures();
+    vi.mocked(f.session.call).mockResolvedValue({ isError: true, data: { candidates: [movie] }, error: new AgentError("timeout", "tmdb") });
+    await expect(new MovieAgent(f.model, f.gateway).respond({ content: "Recomiéndame una película de acción", history: [], signal: signal() }))
+      .rejects.toMatchObject({ code: "timeout", source: "tmdb" });
+    expect(f.session.call).toHaveBeenCalledOnce();
+    expect(f.model.complete).not.toHaveBeenCalled();
   });
   it("compacts large book pages before enforcing the size limit while preserving authors and IDs", async () => {
     const f = fixtures([{ content: "", toolCalls: [{ name: "search_books", arguments: { query: "Marea" } }] }, final]);
@@ -48,9 +69,7 @@ describe("MCP grounding regressions", () => {
   it("keeps errors out of evidence and does not repeat identical MCP calls", async () => {
     const f = fixtures([recommendCall, recommendCall, final]);
     vi.mocked(f.session.call).mockResolvedValue({ isError: true, data: { candidates: [movie] } });
-    const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Recomienda", history: [], signal: signal() });
-    expect(reply.movies).toEqual([]);
-    expect(reply.content).toContain("No dispongo de evidencia");
+    await expect(new MovieAgent(f.model, f.gateway).respond({ content: "Recomienda", history: [], signal: signal() })).rejects.toMatchObject({ code: "unavailable" });
     expect(f.session.call).toHaveBeenCalledOnce();
   });
   it("hydrates visible movie references once, without another model round trip", async () => {
@@ -62,7 +81,18 @@ describe("MCP grounding regressions", () => {
     expect(reply.references).toContainEqual({ provider: "imdb", id: movie.imdb_id, label: `${movie.title} (${movie.year})` });
     expect(reply.context?.movies[0]?.imdbId).toBe(movie.imdb_id);
     expect(f.session.call).toHaveBeenCalledTimes(2);
-    expect(f.model.complete).toHaveBeenCalledTimes(2);
+    expect(f.model.complete).toHaveBeenCalledOnce();
+  });
+  it("keeps a catalog poster and reports a failed IMDb lookup", async () => {
+    const f = fixtures([recommendCall]);
+    vi.mocked(f.gateway.open).mockResolvedValue({ ...f.session, tools });
+    vi.mocked(f.session.call).mockResolvedValueOnce({ isError: false, data: { candidates: [{ ...movie, imdb_id: null }] } })
+      .mockResolvedValueOnce({ isError: true, data: { error: "tool_unavailable" } });
+    const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Recomiéndame una película de acción", history: [], signal: signal() });
+    expect(reply.content).toContain("No pude consultar la referencia de IMDb en TMDB");
+    expect(reply.movies[0]?.poster).toBe(movie.poster);
+    expect(reply.references).toEqual([]);
+    expect(f.session.call).toHaveBeenCalledTimes(2);
   });
   it("completes recommendation → comparison → references using structured context", async () => {
     const f = fixtures([recommendCall, { content: "", toolCalls: [{ name: "search_books", arguments: { query: book.title } }] }, final, compareCall, final]);
@@ -105,6 +135,11 @@ describe("MCP grounding regressions", () => {
 });
 
 describe("evidence projection", () => {
+  it("leaves explicit book titles to the general comparison flow", () => {
+    expect(selectedMovieComparison("¿Compárala con el libro?")).toBe(true);
+    expect(selectedMovieComparison("Compárala con el libro Fundación")).toBe(false);
+  });
+
   it("preserves sources and fields, omitting instructions and unsupported comparison claims", () => {
     expect(compactResult({ overview: "x".repeat(900), sources: ["https://example.org"], value: null })).toEqual({ overview: "x".repeat(800), sources: ["https://example.org"], value: null });
     expect(groundedText("compare_movie_book", { ...comparison, sources: [] })).toContain("No hay evidencia suficiente");

@@ -13,7 +13,8 @@ const responseSchema = z.object({ choices: z.array(z.object({
 
 const toolValidationErrorSchema = z.object({ error: z.object({ code: z.literal("tool_use_failed") }) });
 const truncatedResponseSchema = z.object({ choices: z.array(z.object({ finish_reason: z.literal("length") })).length(1) });
-const MAX_RATE_LIMIT_RETRY_SECONDS = 5;
+const MAX_RATE_LIMIT_RETRY_SECONDS = 1;
+const MAX_COOLDOWN_SECONDS = 60;
 const toolCorrection = {
   role: "system",
   content: "La llamada anterior no cumplió el esquema de las herramientas. Genera una llamada válida usando únicamente las herramientas disponibles y los tipos definidos en su esquema. Si un parámetro opcional no tiene valor, omite la propiedad; no envíes null. No inventes resultados de herramientas."
@@ -21,10 +22,13 @@ const toolCorrection = {
 
 /** Solo inferencia: las herramientas se ejecutan en nuestro backend mediante MCP. */
 export class GroqModel implements LanguageModel {
+  private retryAt = 0;
+
   public constructor(private readonly options: {
     readonly apiKey: string;
     readonly model: string;
     readonly fetch?: typeof fetch;
+    readonly timeoutMs?: number;
     readonly onRateLimit?: (event: {
       readonly retryAfterSeconds: number | null;
       readonly remainingRequests: number | null;
@@ -34,8 +38,11 @@ export class GroqModel implements LanguageModel {
     if (!options.apiKey.trim() || !options.model.trim()) { throw new Error("Groq requires an API key and model"); }
   }
 
-  public async complete(messages: readonly ModelMessage[], tools: readonly ToolDefinition[], signal: AbortSignal) {
-    signal.throwIfAborted();
+  public async complete(messages: readonly ModelMessage[], tools: readonly ToolDefinition[], turnSignal: AbortSignal, onInference?: () => void) {
+    turnSignal.throwIfAborted();
+    if (Date.now() < this.retryAt) { throw new AgentError("rate_limited"); }
+    const deadline = AbortSignal.timeout(this.options.timeoutMs ?? 8000);
+    const signal = AbortSignal.any([turnSignal, deadline]);
     try {
       const body = {
         model: this.options.model, stream: false, temperature: 0, max_completion_tokens: 2048,
@@ -58,18 +65,22 @@ export class GroqModel implements LanguageModel {
       };
       const request: RequestInit = {
         method: "POST", redirect: "error", signal,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.options.apiKey}` },
-        body: JSON.stringify(body)
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.options.apiKey}` }
       };
       const ajv = new Ajv({ strict: false, allErrors: false, validateFormats: false });
       const validators = new Map(tools.map((tool) => [tool.name, ajv.compile(tool.inputSchema)]));
       let correction: typeof toolCorrection | undefined;
-      let correctionUsed = false;
-      // Hasta dos esperas breves por 429 y una corrección; máximo tres solicitudes.
-      for (let attempt = 0; attempt < 3; attempt += 1) {
+      // Una sola repetición por inferencia: corrección o espera breve por cuota.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
         signal.throwIfAborted();
+        if (Date.now() < this.retryAt) { throw new AgentError("rate_limited"); }
+        const history = correction === undefined ? body.messages : [
+          { role: "system", content: [body.messages[0]?.role === "system" ? body.messages[0].content : "", correction.content].filter(Boolean).join("\n") },
+          ...body.messages.slice(body.messages[0]?.role === "system" ? 1 : 0)
+        ];
+        onInference?.();
         const response = await (this.options.fetch ?? fetch)("https://api.groq.com/openai/v1/chat/completions", {
-          ...request, body: JSON.stringify({ ...body, messages: correction === undefined ? body.messages : [...body.messages, correction] })
+          ...request, body: JSON.stringify({ ...body, messages: history })
         });
         if (response.status === 429) {
           const retryAfter = response.headers.get("retry-after");
@@ -85,23 +96,28 @@ export class GroqModel implements LanguageModel {
             remainingRequests: remaining("x-ratelimit-remaining-requests"),
             remainingTokens: remaining("x-ratelimit-remaining-tokens")
           });
-          await response.body?.cancel();
-          if (attempt < 2 && Number.isFinite(seconds) && seconds >= 0 && seconds <= MAX_RATE_LIMIT_RETRY_SECONDS) {
+          if (Number.isFinite(seconds) && seconds > 0) {
+            this.retryAt = Math.max(this.retryAt, Date.now() + Math.min(seconds, MAX_COOLDOWN_SECONDS) * 1000);
+          }
+          await response.body?.cancel().catch(() => undefined);
+          if (attempt === 0 && Number.isFinite(seconds) && seconds >= 0 && seconds <= MAX_RATE_LIMIT_RETRY_SECONDS) {
             await delay(Math.max(250, seconds * 1000 + 250), undefined, { signal });
             continue;
           }
           throw new AgentError("rate_limited");
         }
-        if (response.status === 400 && tools.length > 0 && !correctionUsed && attempt < 2) {
+        if (response.status === 400 && tools.length > 0 && attempt === 0) {
           const failure: unknown = await response.json().catch(() => null);
-          if (toolValidationErrorSchema.safeParse(failure).success) { correction = toolCorrection; correctionUsed = true; continue; }
+          if (toolValidationErrorSchema.safeParse(failure).success) { correction = toolCorrection; continue; }
         }
-        if (!response.ok) { throw new AgentError("unavailable"); }
+        if (!response.ok) {
+          if (!response.bodyUsed) { await response.body?.cancel().catch(() => undefined); }
+          throw new AgentError("unavailable");
+        }
         const raw: unknown = await response.json();
         if (truncatedResponseSchema.safeParse(raw).success) {
-          if (correctionUsed || attempt === 2) { throw new AgentError("unavailable"); }
+          if (attempt === 1) { throw new AgentError("unavailable"); }
           correction = { role: "system", content: "La respuesta anterior se truncó y fue descartada. Responde brevemente o genera una única llamada válida. No reconstruyas ni inventes resultados de herramientas." };
-          correctionUsed = true;
           continue;
         }
         const choice = responseSchema.parse(raw).choices[0]!;
@@ -120,14 +136,14 @@ export class GroqModel implements LanguageModel {
           return { content, toolCalls };
         } catch {
           signal.throwIfAborted();
-          if (correctionUsed || attempt === 2) { throw new AgentError("unavailable"); }
+          if (attempt === 1) { throw new AgentError("unavailable"); }
           correction = toolCorrection;
-          correctionUsed = true;
         }
       }
       throw new AgentError("unavailable");
     } catch (error) {
-      signal.throwIfAborted();
+      turnSignal.throwIfAborted();
+      if (deadline.aborted) { throw new AgentError("timeout"); }
       if (error instanceof AgentError && error.code === "rate_limited") { throw error; }
       throw new AgentError("unavailable");
     }

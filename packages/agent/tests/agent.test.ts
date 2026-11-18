@@ -7,7 +7,7 @@ import { fixtures, movie, recommendCall, signal } from "./helpers.js";
 describe("MovieAgent", () => {
   it("uses tools, isolates external data and returns validated movie cards", async () => {
     const f = fixtures([recommendCall, { content: "Marea alta puede interesarte.", toolCalls: [] }]);
-    const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Recomienda drama", history: [], signal: signal() });
+    const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Busca Marea alta", history: [], signal: signal() });
     expect(reply.movies).toEqual([{ id: 501, title: "Marea alta", year: 2018, poster: movie.poster, imdbId: "tt9950101" }]);
     expect(reply.references).toEqual([{ provider: "imdb", id: "tt9950101", label: "Marea alta (2018)" }]);
     expect(reply.actions).toEqual([]);
@@ -22,7 +22,7 @@ describe("MovieAgent", () => {
     expect(reply.content).toContain("¿Qué géneros te gustan");
     expect(f.gateway.open).not.toHaveBeenCalled();
   });
-  it("recovers a genre recommendation when the model omits its MCP call", async () => {
+  it("queries the requested genre without waiting for the model", async () => {
     const f = fixtures([
       { content: "Prueba una película inventada.", toolCalls: [] },
       { content: "Marea alta puede interesarte.", toolCalls: [] }
@@ -35,6 +35,7 @@ describe("MovieAgent", () => {
     expect(reply.content).toContain("7.8/10");
     expect(reply.content).not.toContain("inventada");
     expect(reply.movies).toHaveLength(1);
+    expect(f.model.complete).not.toHaveBeenCalled();
   });
   it("keeps the recommendation intent when the user answers the welcome question", async () => {
     const f = fixtures([{ content: "Podría interesarte algo.", toolCalls: [] }]);
@@ -71,7 +72,7 @@ describe("MovieAgent", () => {
     expect(reply.content).toContain("Te recomiendo Marea alta");
     expect(reply.content).toContain("La evidencia consultada identifica esta adaptación");
     expect(reply.movies).toHaveLength(1);
-    expect(reply.references).toContainEqual({ provider: "google-books", id: "Book_501", label: "Marea alta" });
+    expect(reply.references).toContainEqual({ provider: "google-books", id: "Book_501", label: "Marea alta", aliases: ["Marea alta"] });
     expect(f.session.close).toHaveBeenCalledOnce();
   });
   it("does not claim an adaptation from an unrelated book during rate-limit recovery", async () => {
@@ -85,11 +86,23 @@ describe("MovieAgent", () => {
     expect(reply.content).not.toContain("identifica esta adaptación");
     expect(f.session.call).toHaveBeenCalledTimes(2);
   });
+  it("reuses the recommendation with its original filters after a provider failure", async () => {
+    const f = fixtures();
+    const specific = { ...recommendCall.toolCalls[0]!, arguments: { genres: [28], min_rating: 7 } };
+    vi.mocked(f.model.complete).mockResolvedValueOnce({ content: "", toolCalls: [specific] })
+      .mockRejectedValueOnce(new AgentError("unavailable"));
+    const reply = await new MovieAgent(f.model, f.gateway).respond({
+      content: "Recomienda una película de acción y dime si adapta un libro", history: [], signal: signal()
+    });
+    expect(reply.movies[0]?.id).toBe(movie.id);
+    expect(reply.context?.recommendation?.criteria).toEqual(specific.arguments);
+    expect(f.session.call).toHaveBeenCalledExactlyOnceWith(specific, expect.any(AbortSignal));
+  });
   it("returns already verified movie evidence if Groq is limited after the MCP call", async () => {
     const f = fixtures();
     vi.mocked(f.model.complete).mockResolvedValueOnce(recommendCall).mockRejectedValueOnce(new AgentError("rate_limited"));
-    const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Recomiéndame ciencia ficción", history: [], signal: signal() });
-    expect(reply.content).toContain("Te recomiendo Marea alta");
+    const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Busca una película de ciencia ficción", history: [], signal: signal() });
+    expect(reply.content).toContain("Marea alta");
     expect(reply.movies[0]?.id).toBe(movie.id);
     expect(f.session.call).toHaveBeenCalledOnce();
     expect(f.session.close).toHaveBeenCalledOnce();
@@ -120,13 +133,14 @@ describe("MovieAgent", () => {
   });
   it("bounds repeated tool calls", async () => {
     const f = fixtures([recommendCall]);
-    await expect(new MovieAgent(f.model, f.gateway, 2).respond({ content: "Consulta", history: [], signal: signal() })).rejects.toMatchObject({ code: "limit_exceeded" });
+    expect((await new MovieAgent(f.model, f.gateway).respond({ content: "Consulta", history: [], signal: signal() })).movies[0]?.id).toBe(movie.id);
     expect(f.session.call).toHaveBeenCalledOnce();
+    expect(f.model.complete).toHaveBeenCalledTimes(2);
   });
   it("does not turn tool errors into evidence", async () => {
     const f = fixtures([recommendCall, { content: "La consulta no está disponible.", toolCalls: [] }]);
     vi.mocked(f.session.call).mockResolvedValue({ isError: true, data: { movie } });
-    expect((await new MovieAgent(f.model, f.gateway).respond({ content: "Consulta", history: [], signal: signal() })).movies).toEqual([]);
+    await expect(new MovieAgent(f.model, f.gateway).respond({ content: "Consulta", history: [], signal: signal() })).rejects.toMatchObject({ code: "unavailable" });
   });
   it("bounds catalog pages before offering candidates to the model", async () => {
     const f = fixtures([recommendCall, { content: "Estos candidatos pueden interesarte.", toolCalls: [] }]);

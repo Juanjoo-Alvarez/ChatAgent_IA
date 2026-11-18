@@ -18,7 +18,9 @@ export function createApi(config: ApiConfig) {
     } })
     : new OllamaModel({ url: config.ollamaUrl, model: config.ollamaModel });
   const gateway = config.toolsMode === "fixture" ? new FixtureGateway() : new McpGateway(config.mcpUrl);
-  const server = createChatServer(config, new MovieAgent(model, gateway), store);
+  const server = createChatServer(config, new MovieAgent(model, gateway, undefined, (event) => {
+    console.info(JSON.stringify({ event: "agent_turn", ...event }));
+  }), store);
   return {
     start: async () => {
       try {

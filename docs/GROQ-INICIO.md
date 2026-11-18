@@ -51,6 +51,8 @@ Probar una recomendación natural, una búsqueda concreta, una comparación y la
 apertura de referencias. El catálogo verificado incluye Dune (2021) y
 The Hunger Games (2012). El cambio de modelo no amplía esa evidencia ni
 garantiza calidad o latencia.
+La comparación general ahora consulta otras asociaciones en Wikidata y Google
+Books; véase [Conversaciones y comparaciones generales](./AGENTE-COMPARACIONES.md).
 
 ```powershell
 $env:RUN_LIVE_EVALS = '1'

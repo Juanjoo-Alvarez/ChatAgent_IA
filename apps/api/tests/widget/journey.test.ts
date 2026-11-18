@@ -11,9 +11,8 @@ describe("Public widget connected to HTTP/WebSocket API", () => {
     const movie = { id: 438631, title: "Dune", year: 2021, poster: "https://image.tmdb.org/t/p/w500/dune.jpg", imdb_id: "tt1160419" };
     const book = { id: "Dune_Book", title: "Dune", authors: ["Frank Herbert", "Editor"] };
     const bookReference = { provider: "google-books", id: book.id };
-    const otherBook = { id: "Other_Dune", title: "Dune", authors: ["Otro autor"] };
     const call = vi.fn().mockResolvedValueOnce({ isError: false, data: { candidates: [movie] } })
-      .mockResolvedValueOnce({ isError: false, data: { results: [book, otherBook], references: [bookReference, { provider: "google-books", id: otherBook.id }] } })
+      .mockResolvedValueOnce({ isError: false, data: { results: [book], references: [bookReference] } })
       .mockResolvedValueOnce({ isError: false, data: { movie, book, references: [bookReference], status: "adaptation_identified",
         sources: ["https://example.org/test-evidence"], differences: [{ text: "La película cubre parte de la novela.", sources: ["https://example.org/test-evidence"] }],
         limitations: ["No se ha verificado fidelidad escena por escena."] } });
@@ -22,10 +21,7 @@ describe("Public widget connected to HTTP/WebSocket API", () => {
     const toolReply = (name: string, args: unknown) => new Response(JSON.stringify({ choices: [{ finish_reason: "tool_calls", message: { tool_calls: [
       { id: `call_${name}`, type: "function", function: { name, arguments: JSON.stringify(args) } }
     ] } }] }));
-    const finalReply = () => new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: "Afirmación inventada por el modelo." } }] }));
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(toolReply("recommend_movies", {})).mockResolvedValueOnce(finalReply())
-      .mockResolvedValueOnce(toolReply("search_books", { query: "Dune Frank Herbert" }))
-      .mockResolvedValueOnce(toolReply("compare_movie_book", { movie_id: movie.id, book_id: book.id })).mockResolvedValueOnce(finalReply());
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(toolReply("recommend_movies", {}));
     const agent = new MovieAgent(new GroqModel({ apiKey: "synthetic", model: "test", fetch: fetchImpl }), gateway);
     const api = await widgetServer(agent);
     const { host } = await mountClient(api.base);
@@ -36,16 +32,56 @@ describe("Public widget connected to HTTP/WebSocket API", () => {
     expect(host.querySelector("img[alt='Póster de Dune']")?.getAttribute("src")).toBe(movie.poster);
     await send(host, "Compárala con el libro");
     await text(host, "La película cubre parte de la novela");
-    expect(host.textContent).not.toContain("Afirmación inventada");
     expect(call).toHaveBeenLastCalledWith(expect.objectContaining({ name: "compare_movie_book", arguments: { movie_id: movie.id, book_id: book.id } }), expect.anything());
     await send(host, "Abre IMDb de Dune (2021)");
     await vi.waitFor(() => expect(popups[0]!.location.replace).toHaveBeenCalledWith("https://www.imdb.com/title/tt1160419/"));
     await send(host, "1. Abre Google Books del libro de Dune");
     await vi.waitFor(() => expect(popups[1]!.location.replace).toHaveBeenCalledWith("https://books.google.com/books?id=Dune_Book"));
     expect(open).toHaveBeenCalledTimes(2);
-    expect(fetchImpl).toHaveBeenCalledTimes(5);
+    expect(fetchImpl).toHaveBeenCalledOnce();
     expect(call).toHaveBeenCalledTimes(3);
     expect(gateway.open).toHaveBeenCalledTimes(2);
+  });
+  it("keeps the genre, seen movies and selected movie through five messages in one widget session", async () => {
+    const first = { id: 150, title: "Costa lejana", year: 2014, poster: "https://image.tmdb.org/t/p/w500/costa.jpg", imdb_id: "tt1230150" };
+    const second = { ...first, id: 151, title: "Mar abierto", year: 2020 };
+    const latest = { ...first, id: 152, title: "La última marea", year: 2025, overview: "Una tripulación vuelve a casa.", genres: ["Acción"] };
+    const book = { id: "Ultima_Marea", title: latest.title, authors: ["Autora"] };
+    const reference = { provider: "google-books", id: book.id };
+    const call = vi.fn().mockResolvedValueOnce({ isError: false, data: { candidates: [first, second] } })
+      .mockResolvedValueOnce({ isError: false, data: { candidates: [second, latest] } })
+      .mockResolvedValueOnce({ isError: false, data: { results: [book] } })
+      .mockResolvedValueOnce({ isError: false, data: { movie: latest, book, references: [reference], status: "adaptation_identified",
+        sources: ["https://example.org/evidence"], differences: [{ text: "La película resume el final del libro.", sources: ["https://example.org/evidence"] }] } });
+    const gateway: ToolGateway = { open: vi.fn(async () => ({ call, close: vi.fn(async () => undefined),
+      tools: ["recommend_movies", "search_books", "compare_movie_book"].map((name) => ({ name, description: "", inputSchema: { type: "object" } })) })) };
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response("provider details", { status: 429, headers: { "retry-after": "60" } }));
+    const onTurn = vi.fn();
+    const agent = new MovieAgent(new GroqModel({ apiKey: "synthetic", model: "test", fetch: fetchImpl }), gateway, undefined, onTurn);
+    const api = await widgetServer(agent);
+    const { host } = await mountClient(api.base);
+    for (const [message, answer] of [
+      ["Recomiéndame una película de acción, por favor", "Te recomiendo Costa lejana"],
+      ["Dame otra", "Te recomiendo Mar abierto"],
+      ["Una más reciente", "Te recomiendo La última marea"],
+      ["¿Por qué esa?", "Una tripulación vuelve a casa."],
+      ["Compárala con el libro", "La película resume el final del libro."]
+    ] as const) {
+      await send(host, message);
+      await text(host, answer);
+    }
+    expect(host.querySelector("img[alt='Póster de La última marea']")?.getAttribute("src")).toBe(latest.poster);
+    const genre = { genres: [28], genre_match: "any" };
+    expect(call.mock.calls.map(([request]) => request)).toEqual([
+      { name: "recommend_movies", arguments: genre },
+      { name: "recommend_movies", arguments: { ...genre, year_from: 2021, sort_by: "primary_release_date.desc" } },
+      { name: "search_books", arguments: { query: latest.title } },
+      { name: "compare_movie_book", arguments: { movie_id: latest.id, book_id: book.id } }
+    ]);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(onTurn.mock.calls[0]?.[0]).toEqual({ durationMs: expect.any(Number), tools: ["recommend_movies"], inferences: 1, errorCode: "rate_limited" });
+    expect(onTurn.mock.calls[3]?.[0]).toEqual({ durationMs: expect.any(Number), tools: [], inferences: 0, errorCode: null });
+    expect(api.createSession).toHaveBeenCalledOnce();
   });
   it.each([
     ["Abre IMDb", "Abre Google Books"],

@@ -123,6 +123,8 @@ export interface SearchMoviesParams {
 }
 
 export interface DiscoverMoviesParams {
+  /** Solo descubrimiento: etiqueta TMDB «based on novel or book». No confirma la obra concreta. */
+  readonly basedOnBook?: boolean | undefined;
   readonly genres?: readonly GenreInput[] | undefined;
   readonly genreMatch?: GenreMatch | undefined;
   readonly year?: number | undefined;
