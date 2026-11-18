@@ -12,13 +12,14 @@ const responseSchema = z.object({
 export class OllamaModel implements LanguageModel {
   public constructor(private readonly options: { readonly url: string; readonly model: string; readonly fetch?: typeof fetch }) {}
 
-  public async complete(messages: readonly ModelMessage[], tools: readonly ToolDefinition[], signal: AbortSignal) {
+  public async complete(messages: readonly ModelMessage[], tools: readonly ToolDefinition[], signal: AbortSignal, onInference?: () => void) {
     signal.throwIfAborted();
+    onInference?.();
     const response = await (this.options.fetch ?? fetch)(new URL("/api/chat", this.options.url), {
       method: "POST", headers: { "Content-Type": "application/json" }, signal,
       body: JSON.stringify({
         model: this.options.model, stream: false, think: false,
-        options: { temperature: 0, num_predict: 1024, num_ctx: 8192 },
+        options: { temperature: 0, num_predict: 384, num_ctx: 8192 },
         messages: messages.map((message) => ({
           role: message.role, content: message.content,
           ...(message.toolName === undefined ? {} : { tool_name: message.toolName }),

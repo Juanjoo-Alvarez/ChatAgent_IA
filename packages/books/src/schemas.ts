@@ -22,7 +22,7 @@ export const preferencesSchema = z.strictObject({
   requires_fidelity: z.boolean().default(false)
 });
 export const compareInput = z.strictObject({
-  movie_id: z.number().int().positive(), book_id: bookIdSchema,
+  movie_id: z.number().int().positive(), book_id: bookIdSchema.optional(),
   preferences: preferencesSchema.default({ genres: [], requires_fidelity: false })
 });
 export const claimSchema = z.strictObject({ text: z.string(), sources: z.array(z.string().url()).min(1) });
@@ -31,6 +31,8 @@ export const comparisonSchema = z.strictObject({
   reasons: z.array(z.string()), similarities: z.array(claimSchema), differences: z.array(claimSchema),
   recommendation: z.strictObject({ verdict: z.enum(["consider", "not_recommended", "undetermined"]), reasons: z.array(z.string()) }),
   limitations: z.array(z.string()), sources: z.array(z.string().url()),
+  synopses: z.strictObject({ movie: z.string().nullable(), book: z.string().nullable() }).optional(),
   references: z.array(z.strictObject({ provider: z.literal("google-books"), id: bookIdSchema })),
-  book: bookSchema, movie_id: z.number().int().positive()
+  book: bookSchema.nullable(), movie_id: z.number().int().positive(),
+  movie: z.strictObject({ id: z.number().int().positive(), title: z.string().nullable(), year: z.number().int().nullable(), poster: z.string().nullable(), imdb_id: z.string().nullable() })
 });

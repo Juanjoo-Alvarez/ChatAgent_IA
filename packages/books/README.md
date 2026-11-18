@@ -61,9 +61,15 @@ del identificador; no se confía en enlaces externos recibidos de Google.
 - `possible_match`: coincide el título, pero falta evidencia o hay contradicción.
 - `insufficient_evidence`: no hay respaldo suficiente para vincular las obras.
 
-El catálogo inicial verificado contiene **Dune (2021), de Denis Villeneuve,
+La comparación general se describe en [Conversaciones y comparaciones generales](../../docs/AGENTE-COMPARACIONES.md).
+`MovieBookService` puede descubrir la obra de origen en Wikidata por ID TMDB
+y buscar una edición de Google Books con título y autor coincidentes.
+Los clientes MCP no pueden aportar sus propias fuentes o asociaciones.
+
+El catálogo manual inicial contiene **Dune (2021), de Denis Villeneuve,
 basada en Dune de Frank Herbert (1965)**. Es deliberadamente limitado; no se
-afirma que otros libros carezcan de adaptación. Se aceptan los títulos de
+afirma que otros libros carezcan de adaptación. También incluye Los juegos del
+hambre (2012); otras asociaciones se consultan dinámicamente. Se aceptan los títulos de
 edición enumerados en `comparison.ts`, con autor coincidente. Una fecha de
 edición posterior a la película no invalida la obra original; una anterior a
 1965 es contradictoria. Las traducciones con otros títulos y compilaciones

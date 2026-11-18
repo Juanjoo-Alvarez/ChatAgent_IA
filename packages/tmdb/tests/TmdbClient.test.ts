@@ -42,6 +42,23 @@ async function captureError(promise: Promise<unknown>): Promise<TmdbError> {
 }
 
 describe("TmdbClient configuration", () => {
+  it.each(["Action", "accion", "ACTION", "Acción"])("resolves bilingual genre aliases through the actual provider taxonomy: %s", async (genre) => {
+    const { client, callsTo } = setup({ "/discover/movie": () => jsonResponse(discoverPage) });
+    const result = await client.getMovieCandidates({ genres: [genre] });
+    expect(callsTo("/discover/movie")[0]?.url.searchParams.get("with_genres")).toBe("28");
+    expect(result.applied_filters.genres).toEqual(["Acción"]);
+  });
+  it("accepts thriller when the localized catalog calls it Suspense, without accepting arbitrary genres", async () => {
+    const { client, callsTo } = setup({ "/genre/movie/list": () => jsonResponse({ genres: [{ id: 53, name: "Suspense" }] }), "/discover/movie": () => jsonResponse(discoverPage) });
+    await client.getMovieCandidates({ genres: ["thriller", "suspenso"] });
+    expect(callsTo("/discover/movie")[0]?.url.searchParams.get("with_genres")).toBe("53");
+    await expect(client.getMovieCandidates({ genres: ["inventado"] })).rejects.toMatchObject({ code: "invalid_request" });
+  });
+  it("filters discovery by book adaptation without treating that label as a verified book association", async () => {
+    const { client, callsTo } = setup({ "/discover/movie": () => jsonResponse(discoverPage) });
+    await client.getMovieCandidates({ basedOnBook: true });
+    expect(callsTo("/discover/movie")[0]?.url.searchParams.get("with_keywords")).toBe("818");
+  });
   it("requires an access token", () => {
     expect(() => new TmdbClient({ accessToken: "  " })).toThrow(TmdbError);
   });

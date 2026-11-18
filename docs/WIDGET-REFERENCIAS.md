@@ -4,11 +4,24 @@ El widget reserva una pestaña durante el envío explícito del usuario, antes d
 esperar al backend. Cliente y servidor usan `resolveReferenceRequest` de
 `@agichat/protocol`: aceptan `Abre IMDb`, `Abre Google Books`, `Open IMDb`,
 `¿Puedes abrir IMDb?`, `¿Podrías abrir Google Books?` y `Can you open IMDb?`.
-También admiten `Por favor, abre…` y un identificador después del proveedor.
+También admiten `Por favor, abre…`, `Abre IMDb de Duna (2021)` y un identificador
+después del proveedor como alternativa cuando dos obras tienen el mismo nombre.
+Se acepta un prefijo de lista como `1. Abre Google Books de The Hunger Games`.
+Tras una comparación verificada, `Abre Google Books del libro de Los juegos del hambre`
+puede usar el título de la película como nombre alternativo del libro; si hay una
+única referencia de Google Books, también se acepta `Abre Google Books del libro
+que mencionaste`. También se aceptan `Abre IMDb de eso`, `Abre su página en IMDb`
+y `Abre Google Books de ese libro`.
+Las peticiones sin título o ID usan las referencias del resultado más reciente,
+no todas las obras acumuladas en la conversación. Una apertura no cambia esa
+selección: después de abrir IMDb se puede pedir el Google Books del mismo libro.
+`Abre eso` requiere una sola referencia entre ambos proveedores en ese resultado.
 Una negación, una orden entre comillas o incrustada en otra frase no autoriza
 la apertura. Una solicitud de ambas páginas a la vez requiere aclaración.
 La referencia debe haber aparecido en un mensaje anterior del agente en esa
-misma instancia. Si hay varias, indicar el identificador para elegir una.
+misma instancia. Si hay varias, el agente muestra nombres y años para elegir;
+la selección por nombre solo procede cuando identifica una referencia única.
+Los nombres e IDs explícitos también permiten volver a una obra anterior.
 
 La reserva comienza en `about:blank` y se desvincula de `window.opener`.
 Una acción estructurada `open-reference` debe coincidir con la referencia

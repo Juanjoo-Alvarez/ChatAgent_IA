@@ -6,7 +6,33 @@ const movie = normalizeMovie({ id: 438631, title: "Dune", original_title: "Dune"
   imageBaseUrl: "https://image.tmdb.org/t/p", posterSize: "w500", genresById: null, imdb: { kind: "not_requested" }
 }) as Movie;
 const book = normalizeBook({ id: "dune", volumeInfo: { title: "Dune", authors: ["Frank Herbert"], publishedDate: "2025" } });
+const hungerGames = normalizeMovie({ id: 70160, title: "Los juegos del hambre", original_title: "The Hunger Games", release_date: "2012-03-23", genres: [{ id: 18, name: "Drama" }], vote_average: 7.2, vote_count: 100 }, {
+  imageBaseUrl: "https://image.tmdb.org/t/p", posterSize: "w500", genresById: null, imdb: { kind: "not_requested" }
+}) as Movie;
+const hungerGamesBook = normalizeBook({ id: "Vo0jcgAACAAJ", volumeInfo: { title: "The Hunger Games", authors: ["Suzanne Collins"], publishedDate: "2008" } });
 describe("grounded comparison", () => {
+  it("verifies the 2012 Hunger Games adaptation with primary sources and rejects other authors", () => {
+    const result = compareMovieBook(hungerGames, hungerGamesBook);
+    expect(result).toMatchObject({ status: "adaptation_identified", recommendation: { verdict: "consider" }, movie_id: 70160 });
+    expect(result.reasons.join(" ")).toContain("Suzanne Collins");
+    expect(result.similarities).toHaveLength(1);
+    expect(result.differences[0]?.sources[0]).toContain("scholastic.com");
+    expect(compareMovieBook(hungerGames, { ...hungerGamesBook, authors: ["Otro autor"] }).status).toBe("possible_match");
+    expect(compareMovieBook({ ...hungerGames, year: 2013 }, hungerGamesBook).status).toBe("possible_match");
+  });
+  it("accepts the documented author among edition credits without accepting derivative works", () => {
+    const edition = { ...book, authors: ["Traductor", "Frank Herbert", "Editor"] };
+    expect(compareMovieBook(movie, edition).status).toBe("adaptation_identified");
+    expect(compareMovieBook(movie, { ...edition, description: "Graphic novel adapted by another author" }).status).toBe("possible_match");
+    expect(compareMovieBook(movie, { ...edition, authors: ["Traductor", "Editor"] }).status).toBe("possible_match");
+    expect(compareMovieBook({ ...movie, id: 999 }, edition).status).toBe("possible_match");
+  });
+  it("includes the movie card alongside the book reference in comparison results", () => {
+    expect(compareMovieBook({ ...movie, poster: "https://image.tmdb.org/t/p/w500/dune.jpg", imdb_id: "tt1160419" }, book)).toMatchObject({
+      movie: { id: movie.id, title: "Dune", poster: "https://image.tmdb.org/t/p/w500/dune.jpg", imdb_id: "tt1160419" },
+      references: [{ provider: "google-books", id: "dune" }]
+    });
+  });
   it("identifies a documented adaptation even for a later edition", () => {
     const result = compareMovieBook(movie, book, { genres: ["Ciencia ficción"] });
     expect(result.status).toBe("adaptation_identified");

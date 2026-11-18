@@ -8,8 +8,8 @@ const id = z.string().uuid();
 const base = { version: z.literal(PROTOCOL_VERSION) };
 
 export const referenceSchema = z.discriminatedUnion("provider", [
-  z.strictObject({ provider: z.literal("imdb"), id: z.string().regex(/^tt\d{7,10}$/) }),
-  z.strictObject({ provider: z.literal("google-books"), id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/) })
+  z.strictObject({ provider: z.literal("imdb"), id: z.string().regex(/^tt\d{7,10}$/), label: z.string().trim().min(1).max(350).optional(), aliases: z.array(z.string().trim().min(1).max(350)).max(5).optional() }),
+  z.strictObject({ provider: z.literal("google-books"), id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/), label: z.string().trim().min(1).max(350).optional(), aliases: z.array(z.string().trim().min(1).max(350)).max(5).optional() })
 ]);
 export type Reference = z.infer<typeof referenceSchema>;
 
@@ -44,11 +44,11 @@ export type UserMessageFrame = Extract<ClientFrame, { type: "user-message" }>;
 
 export const errorCodeSchema = z.enum([
   "invalid_frame", "unauthorized", "session_expired", "busy", "duplicate_request",
-  "timeout", "cancelled", "unavailable", "policy_denied", "limit_exceeded"
+  "timeout", "cancelled", "unavailable", "policy_denied", "limit_exceeded", "rate_limited"
 ]);
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 export const serverFrameSchema = z.discriminatedUnion("type", [
-  z.strictObject({ ...base, type: z.literal("session-ready"), sessionId: id, notice: z.string(), mode: z.enum(["ollama", "fixture"]) }),
+  z.strictObject({ ...base, type: z.literal("session-ready"), sessionId: id, notice: z.string(), mode: z.enum(["ollama", "groq", "fixture"]) }),
   z.strictObject({ ...base, type: z.literal("agent-typing"), requestId: id, isTyping: z.boolean() }),
   z.strictObject({
     ...base, type: z.literal("agent-message"), requestId: id,

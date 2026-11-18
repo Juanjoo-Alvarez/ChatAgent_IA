@@ -14,32 +14,27 @@ function reply(transport: FakeTransportAdapter, id: string) {
 }
 
 describe("Chat welcome and reading experience", () => {
-  it("lets a suggestion prepare an editable, focused draft without sending it", async () => {
+  it("sends a welcome suggestion in one click", async () => {
     const user = userEvent.setup();
     const transport = new FakeTransportAdapter();
     render(<ChatWidget transport={transport} layout="full" welcomeTitle="Hola, soy Sofía." suggestions={suggestions} theme={{ focusRing: "rgb(1, 2, 3)" }} />);
     expect(screen.getByRole("heading", { name: "Hola, soy Sofía." })).toBeVisible();
     await user.click(screen.getByRole("button", { name: /Una película/ }));
     const textbox = screen.getByRole("textbox", { name: "Mensaje" });
-    expect(textbox).toHaveFocus();
-    expect(textbox).toHaveStyle({ boxShadow: "none", borderWidth: "0px" });
-    expect(textbox.closest("form")).toHaveStyle({ boxShadow: "0 0 0 3px rgb(1, 2, 3)" });
-    expect(textbox).toHaveValue("Recomiéndame una película.");
-    expect(transport.sentContents).toEqual([]);
-    await user.clear(textbox);
-    await user.type(textbox, "Mejor un libro{Enter}");
-    expect(transport.sentContents).toEqual(["Mejor un libro"]);
+    expect(transport.sentContents).toEqual(["Recomiéndame una película."]);
     expect(textbox).toHaveValue("");
     expect(screen.queryByRole("group", { name: "Ideas para empezar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Hola, soy Sofía." })).not.toBeInTheDocument();
   });
 
-  it("replaces an unsent draft when another suggestion is selected", async () => {
+  it("keeps a typed draft available after sending a suggestion", async () => {
     const user = userEvent.setup();
-    render(<ChatWidget transport={new FakeTransportAdapter()} suggestions={suggestions} />);
-    await user.click(screen.getByRole("button", { name: /Una película/ }));
+    const transport = new FakeTransportAdapter();
+    render(<ChatWidget transport={transport} suggestions={suggestions} />);
+    await user.type(screen.getByRole("textbox"), "Mi borrador");
     await user.click(screen.getByRole("button", { name: "Un libro" }));
-    expect(screen.getByRole("textbox")).toHaveValue("Busco un libro.");
+    expect(transport.sentContents).toEqual(["Busco un libro."]);
+    expect(screen.getByRole("textbox")).toHaveValue("Mi borrador");
   });
 
   it("clears the previous conversation and draft when changing sessions", async () => {

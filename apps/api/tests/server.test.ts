@@ -50,6 +50,23 @@ describe("HTTP sessions and upgrade security", () => {
 });
 
 describe("authenticated conversation", () => {
+  it("persists typed movie/book context across reconnection without exposing it as protocol fields", async () => {
+    const context = { movies: [{ id: 438631, title: "Dune", year: 2021, poster: null, imdbId: "tt1160419" }], books: [{ id: "Book_Dune", title: "Dune", authors: ["Frank Herbert", "Editor"] }] };
+    const agent = fakeAgent();
+    vi.mocked(agent.respond).mockResolvedValueOnce({ ...reply, context }).mockResolvedValue(reply);
+    const api = await start(agent);
+    const credentials = await api.credentials();
+    const first = await authenticated(api.base, credentials);
+    first.send(message("Recomienda Dune"));
+    const response = await first.next("agent-message");
+    expect(response).not.toHaveProperty("context");
+    expect((await api.store.get(credentials.sessionId))?.turns[0]?.context).toEqual(context);
+    first.ws.terminate();
+    const second = await authenticated(api.base, credentials);
+    second.send(message("Compárala con el libro"));
+    await second.next("agent-message");
+    expect(agent.respond).toHaveBeenLastCalledWith(expect.objectContaining({ history: [expect.objectContaining({ context })] }));
+  });
   it("requires the issued token, not just a session identifier", async () => {
     const api = await start();
     const credentials = await api.credentials();
@@ -73,6 +90,25 @@ describe("authenticated conversation", () => {
     expect(await client.next("agent-typing")).toMatchObject({ isTyping: true });
     expect(await client.next("agent-message")).toMatchObject({ requestId: request.requestId, message: { content: reply.content } });
     expect(await client.next("agent-typing")).toMatchObject({ isTyping: false });
+  });
+  it("releases a slow session lock before the next message can follow the response", async () => {
+    const store = new InMemorySessionStore();
+    const release = store.release.bind(store);
+    let released = false;
+    vi.spyOn(store, "release").mockImplementation(async (...args) => {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      await release(...args);
+      released = true;
+    });
+    const api = await start(fakeAgent(), store);
+    const client = await authenticated(api.base, await api.credentials());
+    client.send(message("Primera película"));
+    await client.next("agent-typing");
+    await client.next("agent-message");
+    expect(released).toBe(true);
+    client.send(message("Dame otra"));
+    await client.next("agent-message");
+    expect(api.agent.respond).toHaveBeenLastCalledWith(expect.objectContaining({ history: [expect.objectContaining({ user: "Primera película" })] }));
   });
   it("restores context after reconnection and replays recent requests without rerunning the agent", async () => {
     const api = await start();
@@ -162,6 +198,34 @@ describe("authenticated conversation", () => {
     const error = await client.next("error");
     expect(error).toMatchObject({ code: cause instanceof AgentError ? "policy_denied" : "unavailable" });
     expect(JSON.stringify(error)).not.toContain("secret-provider-key");
+  });
+  it("describes a Groq rate limit as temporary and retryable", async () => {
+    const agent = fakeAgent(); vi.mocked(agent.respond).mockRejectedValue(new AgentError("rate_limited"));
+    const api = await start(agent);
+    const client = await authenticated(api.base, await api.credentials());
+    client.send(message());
+    expect(await client.next("error")).toMatchObject({
+      code: "rate_limited", retryable: true,
+      message: "Groq aplicó un límite de uso temporal. Intenta nuevamente más tarde."
+    });
+  });
+  it("reports a TMDB rate limit as a catalog error", async () => {
+    const agent = fakeAgent();
+    vi.mocked(agent.respond).mockRejectedValueOnce(new AgentError("rate_limited", "tmdb"));
+    const api = await start(agent);
+    const client = await authenticated(api.base, await api.credentials());
+    client.send(message());
+    expect(await client.next("error")).toMatchObject({ code: "rate_limited", retryable: true, message: expect.stringContaining("TMDB") });
+    client.send(message());
+    await client.next("agent-message");
+  });
+  it.each([["google-books", "Google Books"], ["wikidata", "Wikidata"]] as const)("names the actual provider %s in safe errors", async (source, name) => {
+    const agent = fakeAgent();
+    vi.mocked(agent.respond).mockRejectedValueOnce(new AgentError("rate_limited", source));
+    const api = await start(agent);
+    const client = await authenticated(api.base, await api.credentials());
+    client.send(message());
+    expect(await client.next("error")).toMatchObject({ code: "rate_limited", retryable: true, message: expect.stringContaining(name) });
   });
   it("rejects expired sessions during a conversation", async () => {
     let time = 0;

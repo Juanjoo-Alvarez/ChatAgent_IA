@@ -31,6 +31,7 @@ export const getMovieDetailsInput = {
 };
 
 export const recommendMoviesInput = {
+  based_on_book: z.boolean().describe("Busca candidatos etiquetados por TMDB como basados en novela o libro (solo sin query). Verifica después la obra con compare_movie_book.").optional(),
   query: z
     .string()
     .trim()

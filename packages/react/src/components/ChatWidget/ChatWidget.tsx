@@ -108,7 +108,7 @@ export const ChatWidget = ({
             {suggestions.length > 0 && <div className="agichat-welcome__suggestions" role="group" aria-label="Ideas para empezar">
               {suggestions.map((suggestion) => (
                 <button className="agichat-welcome__suggestion" type="button" key={suggestion.label} disabled={isSending}
-                  onClick={() => { setDraft(suggestion.prompt); inputRef.current?.focus(); }}>
+                  onClick={() => { followLatest.current = true; void sendMessage(suggestion.prompt); }}>
                   <span><strong>{suggestion.label}</strong>{suggestion.description !== undefined && <small>{suggestion.description}</small>}</span>
                   <SendIcon />
                 </button>

@@ -160,7 +160,8 @@ Probar este recorrido:
 4. «¿Puedes abrir IMDb?».
 5. «¿Podrías abrir Google Books?».
 
-El catálogo actual verifica la adaptación de Dune (2021). Si aparecen varias
+El catálogo actual verifica las adaptaciones de Dune (2021) y The Hunger Games
+(2012). Si aparecen varias
 ediciones o referencias, seleccionar la correspondiente o indicar su ID después
 del proveedor. Las dos páginas se solicitan por separado. Si el navegador
 bloquea ventanas emergentes, permitirlas únicamente para el origen de la demo

@@ -9,6 +9,8 @@ export interface MessageCard {
 export interface MessageReference {
   readonly provider: string;
   readonly id: string;
+  readonly label?: string | undefined;
+  readonly aliases?: readonly string[] | undefined;
 }
 
 export interface ReferenceAction {

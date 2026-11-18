@@ -64,6 +64,21 @@ export const TMDB_QUOTA_PROVIDER = "tmdb";
 /** Versión del contrato en las claves: cambiarla invalida la caché anterior. */
 export const TMDB_CACHE_NAMESPACE = "tmdb:v2";
 
+// IDs de la taxonomía TMDB. La API traduce los nombres según el idioma del servidor;
+// los usuarios y los modelos pueden usar los equivalentes en español o inglés.
+const GENRE_ALIASES = new Map<number, readonly string[]>([
+  [28, ["accion", "action"]], [12, ["aventura", "aventuras", "adventure"]],
+  [16, ["animacion", "animation"]], [35, ["comedia", "comedy"]],
+  [80, ["crimen", "crime"]], [99, ["documental", "documentary"]],
+  [18, ["drama"]], [10751, ["familia", "familiar", "family"]],
+  [14, ["fantasia", "fantasy"]], [36, ["historia", "history"]],
+  [27, ["terror", "horror"]], [10402, ["musica", "music"]],
+  [9648, ["misterio", "mystery"]], [10749, ["romance"]],
+  [878, ["ciencia ficcion", "science fiction", "sci-fi", "scifi"]],
+  [10770, ["pelicula de tv", "tv movie"]], [53, ["suspenso", "suspense", "thriller"]],
+  [10752, ["guerra", "belica", "war"]], [37, ["western", "oeste"]]
+]);
+
 export interface TmdbCacheTtl {
   readonly genres: number;
   readonly details: number;
@@ -408,6 +423,7 @@ export class TmdbClient {
       },
       filters_applied_locally: local,
       ignored_filters: [
+        ...(criteria.basedOnBook ? ["based_on_book"] : []),
         ...(sortBy === undefined ? [] : ["sort_by"]),
         ...(originalLanguage === undefined ? [] : ["original_language"])
       ],
@@ -438,6 +454,7 @@ export class TmdbClient {
     return {
       page,
       query: {
+        with_keywords: params.basedOnBook ? "818" : undefined,
         with_genres: withGenres,
         primary_release_year: years.year,
         "primary_release_date.gte": years.yearFrom === undefined ? undefined : `${years.yearFrom}-01-01`,
@@ -508,7 +525,8 @@ export class TmdbClient {
       const genre =
         typeof input === "number"
           ? catalog.find((item) => item.id === input)
-          : catalog.find((item) => comparisonKey(item.name) === comparisonKey(input));
+          : catalog.find((item) => comparisonKey(item.name) === comparisonKey(input))
+            ?? catalog.find((item) => GENRE_ALIASES.get(item.id)?.includes(comparisonKey(input)));
 
       if (genre === undefined) {
         unknown.push(input);
