@@ -8,6 +8,8 @@ x-api: &api
     CHAT_PORT: 8000
     CHAT_ALLOWED_ORIGINS: ${CHAT_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
     AGENT_MODE: ${AGENT_MODE:-ollama}
+    GROQ_API_KEY: ${GROQ_API_KEY:-}
+    GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
     TOOLS_MODE: mcp
     MCP_URL: http://mcp:8001/mcp
     OLLAMA_URL: http://host.docker.internal:11434
@@ -39,6 +41,7 @@ services:
       GOOGLE_BOOKS_API_KEY: "${GOOGLE_BOOKS_API_KEY:-}"
       GOOGLE_BOOKS_TIMEOUT_MS: "${GOOGLE_BOOKS_TIMEOUT_MS:-8000}"
       QUOTA_GOOGLE_BOOKS: "${QUOTA_GOOGLE_BOOKS:-}"
+      QUOTA_WIKIDATA: "${QUOTA_WIKIDATA:-2/1s,300/1d}"
       SHARED_STORE: redis
       REDIS_URL: redis://redis:6379
     ports:

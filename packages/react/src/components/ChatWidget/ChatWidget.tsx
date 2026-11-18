@@ -28,6 +28,7 @@ export interface ChatWidgetProps {
   readonly suggestions?: readonly ChatSuggestion[];
   readonly layout?: "widget" | "full";
   readonly theme?: AGIChatThemeOverride;
+  /** true: siempre visibles; false: ocultos; sin definir: aparecen con recomendaciones. */
   readonly showTmdbCredits?: boolean;
 }
 
@@ -44,7 +45,7 @@ export const ChatWidget = ({
   suggestions = [],
   layout = "widget",
   theme: themeOverride,
-  showTmdbCredits = false
+  showTmdbCredits
 }: ChatWidgetProps): ReactElement => {
   const theme = resolveTheme(themeOverride);
   const { messages, isAgentTyping, isSending, error, sendMessage, connectionStatus, capabilityNotice, mode } = useChat({
@@ -107,7 +108,7 @@ export const ChatWidget = ({
             {suggestions.length > 0 && <div className="agichat-welcome__suggestions" role="group" aria-label="Ideas para empezar">
               {suggestions.map((suggestion) => (
                 <button className="agichat-welcome__suggestion" type="button" key={suggestion.label} disabled={isSending}
-                  onClick={() => { setDraft(suggestion.prompt); inputRef.current?.focus(); }}>
+                  onClick={() => { followLatest.current = true; void sendMessage(suggestion.prompt); }}>
                   <span><strong>{suggestion.label}</strong>{suggestion.description !== undefined && <small>{suggestion.description}</small>}</span>
                   <SendIcon />
                 </button>
@@ -119,8 +120,6 @@ export const ChatWidget = ({
             {messages.map((message) => <MessageBubble key={message.id} message={message} theme={theme} />)}
           </div>
         )}
-        {(showTmdbCredits || messages.some((message) => message.role === "agent" && message.cards.length > 0)) &&
-          <div className="agichat-widget__credits"><TmdbCredits /></div>}
       </div>
 
       {isAgentTyping && <div className="agichat-widget__typing" role="status" aria-label="El agente está escribiendo">
@@ -141,6 +140,8 @@ export const ChatWidget = ({
           {...(placeholder !== undefined ? { placeholder } : {})} />
         <p className="agichat-widget__input-hint">Enter para enviar · Shift + Enter para un salto de línea</p>
       </div>
+      {(showTmdbCredits ?? messages.some((message) => message.role === "agent" && message.cards.length > 0)) &&
+        <div className="agichat-widget__credits"><TmdbCredits /></div>}
     </section>
   );
 };

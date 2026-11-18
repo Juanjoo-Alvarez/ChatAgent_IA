@@ -8,8 +8,8 @@ import { bookIdSchema, searchBooksInput, type Book } from "./schemas.js";
 
 export const GOOGLE_BOOKS_PROVIDER = "google-books";
 export class BooksError extends Error {
-  public constructor(public readonly code: string, public readonly retryable = false) {
-    super(`Google Books: ${code}`);
+  public constructor(public readonly code: string, public readonly retryable = false, public readonly source: "google-books" | "wikidata" = "google-books") {
+    super(`${source === "wikidata" ? "Wikidata" : "Google Books"}: ${code}`);
     this.name = "BooksError";
   }
 }

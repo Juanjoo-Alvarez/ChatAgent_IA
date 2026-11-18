@@ -43,23 +43,20 @@ function missingFields(movie: Movie): MovieField[] {
 async function run(
   logger: Logger,
   tool: string,
-  args: Record<string, unknown>,
   operation: () => Promise<Record<string, unknown>>
 ): Promise<CallToolResult> {
   const startedAt = Date.now();
   try {
     const result = success(await operation());
-    logger.info("tool_call", { tool, args, outcome: "ok", duration_ms: Date.now() - startedAt });
+    logger.info("tool_call", { tool, outcome: "ok", duration_ms: Date.now() - startedAt });
     return result;
   } catch (error) {
     const payload = toErrorPayload(error);
     logger.error("tool_call", {
       tool,
-      args,
       outcome: "error",
       code: payload.error.code,
-      duration_ms: Date.now() - startedAt,
-      ...(payload.error.code === "internal_error" ? { cause: String(error) } : {})
+      duration_ms: Date.now() - startedAt
     });
     return toolErrorResult(payload);
   }
@@ -80,7 +77,7 @@ export function registerMovieTools(server: McpServer, { movies, logger }: MovieT
       annotations: READ_ONLY
     },
     (args) =>
-      run(logger, "search_movies", args, async () => ({
+      run(logger, "search_movies", async () => ({
         ...(await movies.searchMovies({
           query: args.query,
           year: args.year,
@@ -105,7 +102,7 @@ export function registerMovieTools(server: McpServer, { movies, logger }: MovieT
       annotations: READ_ONLY
     },
     (args) =>
-      run(logger, "get_movie_details", args, async () => {
+      run(logger, "get_movie_details", async () => {
         const movie = await movies.getMovieDetails(args.movie_id);
         return { movie, missing_fields: missingFields(movie), content_notice: UNTRUSTED_CONTENT_NOTICE };
       })
@@ -125,8 +122,9 @@ export function registerMovieTools(server: McpServer, { movies, logger }: MovieT
       annotations: READ_ONLY
     },
     (args) =>
-      run(logger, "recommend_movies", args, async () => ({
+      run(logger, "recommend_movies", async () => ({
         ...(await movies.getMovieCandidates({
+          basedOnBook: args.based_on_book,
           query: args.query,
           genres: args.genres,
           genreMatch: args.genre_match,

@@ -70,7 +70,8 @@ export function loadConfig(env: Env): ServerConfig {
 
   let quotaPolicies: Record<string, ProviderQuotaPolicy>;
   try {
-    quotaPolicies = quotaPoliciesFromEnv(env, [TMDB_QUOTA_PROVIDER, ...(optional(env, "GOOGLE_BOOKS_ENABLED") === "true" ? ["google-books"] : [])]);
+    quotaPolicies = quotaPoliciesFromEnv({ ...env, QUOTA_WIKIDATA: optional(env, "QUOTA_WIKIDATA") ?? "2/1s,300/1d" },
+      [TMDB_QUOTA_PROVIDER, ...(optional(env, "GOOGLE_BOOKS_ENABLED") === "true" ? ["google-books", "wikidata"] : [])]);
   } catch (error) {
     throw new ConfigError(error instanceof Error ? error.message : String(error));
   }

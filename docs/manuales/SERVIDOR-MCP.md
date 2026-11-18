@@ -6,7 +6,8 @@ mediante el transporte **Streamable HTTP**. Lo consume el agente de AGIChat y
 puede consumirlo cualquier cliente MCP compatible.
 
 Revisado contra el código del commit `ccd40d9` y con el servidor en ejecución
-el 17 de noviembre de 2026.
+el 17 de noviembre de 2026. Actualizado con los cambios posteriores de `main` en
+`compare_movie_book` (Wikidata y `book_id` opcional).
 
 ## Ejecución
 
@@ -54,7 +55,7 @@ Las herramientas de libros solo existen con `GOOGLE_BOOKS_ENABLED=true`.
 | `recommend_movies` | Candidatos filtrados | `query`, `genres`, `genre_match`, `year`, `year_from`, `year_to`, `min_rating`, `min_vote_count`, `sort_by`, `original_language`, `page` | `candidates: Movie[]`, `applied_filters` |
 | `search_books` | Buscar libros candidatos | `query`, `start_index`, `max_results` | `results: Book[]`, `references` |
 | `get_book_details` | Detalles de un libro | `book_id` | `book: Book`, `references` |
-| `compare_movie_book` | Comparar película y libro | `movie_id`, `book_id`, `preferences` | `status`, `recommendation`, `similarities`, `differences`, `sources` |
+| `compare_movie_book` | Comparar película y libro | `movie_id`, `book_id` (opcional), `preferences` | `status`, `recommendation`, `similarities`, `differences`, `sources` |
 
 ### `search_movies`
 
@@ -142,17 +143,20 @@ Salida: `book`, `references` (la referencia `google-books` del volumen) y
 | Parámetro | Tipo | Reglas |
 | --- | --- | --- |
 | `movie_id` | integer | Obligatorio. ID de TMDB |
-| `book_id` | string | Obligatorio. ID de Google Books |
+| `book_id` | string | Opcional. ID de Google Books. Si se omite, el servidor busca la obra de origen en Wikidata y una edición coincidente en Google Books |
 | `preferences.genres` | string[] | Opcional, hasta 10 |
 | `preferences.min_rating` | number | Opcional, de 0 a 10. Es la valoración de TMDB, no una medida de fidelidad |
 | `preferences.requires_fidelity` | boolean | Opcional, `false` por defecto |
 
-La herramienta recupera ambos registros por ID. **No acepta sinopsis, fuentes ni
-una bandera de adaptación aportadas por el modelo.**
+La herramienta recupera los registros por ID. **No acepta sinopsis, fuentes ni
+una bandera de adaptación aportadas por el modelo.** Sin `book_id`, consulta la
+obra de origen de la película en Wikidata (propiedades P4947, P144 y P50) y busca
+una edición con título y autor coincidentes en Google Books. Ver
+[AGENTE-COMPARACIONES.md](../AGENTE-COMPARACIONES.md).
 
 | `status` | Significado |
 | --- | --- |
-| `adaptation_identified` | La película, el año, el título del libro y el autor coinciden con un registro revisado en el servidor |
+| `adaptation_identified` | La película, el año, el título del libro y el autor coinciden con un registro revisado en el servidor o con una asociación de Wikidata |
 | `possible_match` | Coincide el título, pero falta evidencia |
 | `insufficient_evidence` | No hay respaldo para vincular las obras |
 
@@ -162,10 +166,11 @@ una bandera de adaptación aportadas por el modelo.**
 | `not_recommended` | La valoración de TMDB es menor que `min_rating` |
 | `undetermined` | No hay adaptación confirmada, se exige fidelidad o faltan datos |
 
-El registro revisado (`VERIFIED_ADAPTATIONS`) contiene **solo Dune (2021), basada
-en Dune de Frank Herbert**. Cada semejanza y diferencia incluye sus fuentes.
+El registro revisado en el servidor cubre **Dune (2021)**, basada en la novela de
+Frank Herbert, y **The Hunger Games (2012)**, basada en la de Suzanne Collins. Las
+semejanzas y diferencias concretas solo se afirman con esas fuentes revisadas.
 
-Ejemplo verificado: `{ "movie_id": 438631, "book_id": "JhJ7cgAACAAJ" }`
+Ejemplo verificado sobre `ccd40d9`: `{ "movie_id": 438631, "book_id": "JhJ7cgAACAAJ" }`
 devolvió `status: "adaptation_identified"` y `verdict: "consider"`.
 
 ## Contratos de datos
@@ -231,12 +236,13 @@ validan ese campo contra el esquema de éxito). El texto contiene un JSON:
 | `network` | Sí | No se pudo conectar |
 | `unexpected_status` | No | Otro estado HTTP |
 | `bad_response` | No | Respuesta que no se pudo procesar |
-| `quota_exhausted` | No | Se alcanzó `QUOTA_TMDB` o `QUOTA_GOOGLE_BOOKS`; `retry_after_ms` indica cuándo habrá cupo |
+| `quota_exhausted` | No | Se alcanzó `QUOTA_TMDB`, `QUOTA_GOOGLE_BOOKS` o `QUOTA_WIKIDATA`; `retry_after_ms` indica cuándo habrá cupo |
 | `quota_unavailable` | No | No se pudo consultar Redis; la solicitud no se envió |
 | `internal_error` | No | Error inesperado; el detalle solo va a los logs |
 
-En las herramientas de libros, `message` es siempre «No se pudo completar la
-consulta de Google Books.» y `retry_after_ms` es `null`. Los argumentos que no
+En las herramientas de libros, `message` es «No se pudo completar la consulta de
+Google Books.» o, si falla Wikidata, «No se pudo comprobar la obra de origen en
+Wikidata.» con `source: "wikidata"`. `retry_after_ms` es `null`. Los argumentos que no
 cumplen `inputSchema` se rechazan antes de ejecutar la herramienta, con un texto
 que empieza por `Input validation error`.
 

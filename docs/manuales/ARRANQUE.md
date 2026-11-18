@@ -17,7 +17,8 @@ PowerShell; la variante para bash aparece cuando es distinta.
 | Modo | Para qué sirve | Necesita |
 | --- | --- | --- |
 | Sin credenciales (`fixture`) | Probar el widget, la API y el WebSocket sin LLM ni proveedores | Node y pnpm |
-| Real | Producto completo: Ollama, TMDB y Google Books | Docker, Ollama, token TMDB |
+| Real con Ollama | Producto completo con el modelo local: Ollama, TMDB y Google Books | Docker, Ollama, token TMDB |
+| Real con Groq | Producto completo con el modelo alojado en Groq; Ollama no hace falta | Docker, clave de Groq, token TMDB. Ver [GROQ-INICIO.md](../GROQ-INICIO.md) |
 | Compose `backend` | MCP, API y Redis en contenedores | Docker y variables en el entorno |
 | Compose `scale` | Dos réplicas de la API detrás de un proxy | Lo mismo que `backend` |
 
@@ -52,7 +53,8 @@ es válido: consulta datos reales del MCP sin llamar al modelo. La combinación
 ## 2. Modo real, paso a paso
 
 El orden es **Ollama → Redis → MCP → API → demo**. Cada servicio depende del
-anterior.
+anterior. Para usar Groq en lugar de Ollama, omite el paso 2.1 y configura la API
+como indica [GROQ-INICIO.md](../GROQ-INICIO.md).
 
 ### 2.1 Ollama
 
@@ -194,9 +196,12 @@ carga el modelo en memoria.
 Las frases «No escribas enlaces, URLs ni avisos» evitan que el modelo copie URLs
 de TMDB, porque `safeOutput` rechazaría la respuesta con `policy_denied` (ver
 [LIMITACIONES.md](../entrega/LIMITACIONES.md)). La búsqueda de libros devuelve
-varias ediciones, así que Google Books necesita el identificador. El catálogo de
-adaptaciones verificadas solo incluye Dune (2021). El guion completo está en
-[GUION-DEMO.md](../entrega/GUION-DEMO.md).
+varias ediciones, así que Google Books necesita el identificador. Este recorrido
+se probó con Ollama sobre `ccd40d9`. Desde entonces, `main` reduce las URLs que
+recibe el modelo y admite órdenes como «Abre Google Books de ese libro», así que
+esas precauciones pueden no ser necesarias. El registro de adaptaciones
+revisadas incluye Dune (2021) y The Hunger Games (2012). El guion completo está
+en [GUION-DEMO.md](../entrega/GUION-DEMO.md).
 
 ## 3. Comprobar cada servicio
 

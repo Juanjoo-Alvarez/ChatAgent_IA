@@ -8,6 +8,7 @@ import {
   Session
 } from "@agichat/core";
 import { ReferenceNavigator } from "../browser/ReferenceNavigator";
+import { referenceScope } from "@agichat/protocol";
 
 export interface UseChatOptions {
   readonly transport: ITransportAdapter;
@@ -131,7 +132,12 @@ export const useChat = (options: UseChatOptions): UseChatResult => {
 
     const navigator = navigatorRef.current;
     try {
-      navigator?.begin(text, engine.getMessages().flatMap((message) => message.role === "agent" ? message.references : []));
+      let user = "";
+      const history = engine.getMessages().flatMap((message) => {
+        if (message.role === "user") { user = message.content; return []; }
+        return [{ user, references: message.references, movies: message.cards }];
+      });
+      navigator?.begin(text, history.flatMap((turn) => turn.references), referenceScope(history));
       await engine.sendUserMessage(text);
     } catch (caughtError: unknown) {
       if (engineRef.current === engine) { setError(toError(caughtError)); }

@@ -15,9 +15,9 @@ export class ReferenceNavigator {
 
   public constructor(private readonly open: () => ReferenceWindow | null = () => window.open("about:blank", "_blank")) {}
 
-  public begin(text: string, known: readonly MessageReference[]): void {
+  public begin(text: string, known: readonly MessageReference[], current: readonly unknown[] = known): void {
     this.finish();
-    const { reference } = resolveReferenceRequest(text, known);
+    const { reference } = resolveReferenceRequest(text, known, undefined, current);
     if (reference === null) { return; }
     const reserved = this.open();
     if (reserved === null) { throw new Error("Permite las ventanas emergentes para este sitio y vuelve a pedir abrir la referencia."); }

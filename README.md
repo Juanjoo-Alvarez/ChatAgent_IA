@@ -11,7 +11,7 @@ del curso CC3116 de la Universidad del Valle de Guatemala.
 
 > **Estado de CI.** El badge aparece en rojo porque GitHub no ejecuta los
 > workflows desde el 6 de noviembre de 2026 por un bloqueo de facturación de la
-> cuenta propietaria. Lint, build, typecheck y las 606 pruebas pasan en local.
+> cuenta propietaria. Lint, build, typecheck y las 775 pruebas pasan en local.
 > Ver [VERIFICACION.md](docs/calidad/VERIFICACION.md#estado-de-ci-en-github).
 
 ## Contenido
@@ -97,7 +97,7 @@ flowchart LR
         P["Proxy nginx"]
         A["API: réplicas A y B"]
         G["MovieAgent"]
-        O["Ollama"]
+        O["Ollama local o Groq"]
         M["Servidor MCP"]
         P --> A --> G
         G --> O
@@ -124,8 +124,9 @@ Por qué esta arquitectura:
   cuotas, y la comparación necesita ambos catálogos.
 - **Estado en Redis.** Sesiones, leases, caché y cuotas son compartidos, así que
   la API y el MCP se replican sin sesiones pegajosas.
-- **Modelo local detrás de `LanguageModel`.** Ollama no tiene costo ni pide
-  tarjeta, y otro proveedor solo requiere otro adaptador.
+- **Modelo detrás de `LanguageModel`.** Ollama local (predeterminado) o Groq
+  alojado (`AGENT_MODE=groq`), ambos sin costo ni tarjeta. Cambiar de proveedor
+  solo requiere otro adaptador.
 - **Navegación en el cliente, validada en el servidor.** El modelo nunca genera
   URLs.
 
@@ -161,26 +162,28 @@ defensas en capas están en [AGENTE.md](docs/arquitectura/AGENTE.md).
   `SHARED_STORE=redis`). Una sesión creada en una réplica continúa en otra.
 - **El estado vive en Redis**: sesiones, hash del token, turnos, lease del turno
   en curso, caché y contadores de cuota.
-- **No escalan** Ollama, que es un proceso en un equipo, ni las cuotas de los
-  proveedores. `MAX_CONCURRENT_TURNS` es por réplica.
+- **No escala** el modelo (Ollama es un proceso en un equipo y Groq está limitado
+  por su cuota gratuita), ni las cuotas de los proveedores.
+  `MAX_CONCURRENT_TURNS` es por réplica.
 
-Mediciones del 17 de noviembre de 2026 (commit `ccd40d9`, AMD Ryzen 7 260 con
-NVIDIA RTX 5050 Laptop):
+Mediciones del 18 de noviembre de 2026 sobre `main` (`c1527bf`), AMD Ryzen 7 260
+con NVIDIA RTX 5050 Laptop:
 
 | Medición | Resultado |
 | --- | --- |
-| Dos réplicas en modo fixture, 100 turnos concurrentes | p50 5.4 ms, p95 11.6 ms; 38 correctos y 62 `busy` (2 × 4 plazas); 0 errores de otro tipo |
-| Aislamiento, idempotencia, lease y reconexión entre réplicas | Todos correctos |
-| LLM real detrás del proxy, turnos secuenciales | p50 3.64 s |
-| LLM real, 3 turnos a la vez | Entre 17.6 y 37.8 s: Ollama es el cuello de botella |
+| Dos réplicas en modo fixture, 100 turnos concurrentes | p50 9.8 ms, p95 21.3 ms; 40 correctos y 60 `busy` (2 × 4 plazas); 0 errores de otro tipo |
+| Aislamiento, idempotencia, lease, mensaje inmediato y reconexión entre réplicas | Todos correctos |
+| LLM real (Ollama) detrás del proxy, 8 turnos | 8 de 8 correctos; p50 1.18 s; 26 solicitudes a TMDB |
+| LLM real (Ollama), 3 turnos a la vez | Entre 0.38 y 1.94 s: las peticiones sencillas ya no pasan por el modelo |
 
 Detalle en [ESCALABILIDAD.md](docs/arquitectura/ESCALABILIDAD.md).
 
 ## Inicio rápido
 
-**Requisitos:** Node.js 22, Corepack, pnpm 11.19.0, Docker Desktop y Ollama con
-el modelo `qwen3:4b-instruct-2507-q4_K_M`. El modo sin credenciales solo
-necesita Node.js y pnpm.
+**Requisitos:** Node.js 22, Corepack, pnpm 11.19.0, Docker Desktop y un
+proveedor de modelo: Ollama con `qwen3:4b-instruct-2507-q4_K_M` o una clave
+gratuita de Groq ([GROQ-INICIO.md](docs/GROQ-INICIO.md)). El modo sin
+credenciales solo necesita Node.js y pnpm.
 
 ```powershell
 git clone https://github.com/Juanjoo-Alvarez/ChatAgent_IA.git
@@ -351,12 +354,15 @@ la API de toda acción de navegación.
 
 | Evaluación | Casos | Aprobados |
 | --- | --- | --- |
-| Deterministas en CI (`pnpm eval:agent`) | 31 | 31 |
+| Deterministas en CI (`pnpm eval:agent`), sin LLM | 31 | 31 |
 | Reales, funcionales | 10 | 5 |
 | Reales, LLM01 | 10 | 10 (0 % de éxito del ataque) |
 | Reales, LLM07 | 10 | 10 (0 % de éxito del ataque) |
 
-Ejecución real del 17 de noviembre de 2026 con `qwen3:4b-instruct-2507-q4_K_M`.
+Las evals reales se ejecutaron el 17 de noviembre de 2026 con **Ollama**
+(`qwen3:4b-instruct-2507-q4_K_M`) sobre `ccd40d9` y no se repitieron con Groq.
+Las pruebas con Groq (comparación de modelos y conversaciones generales) se
+describen en [VERIFICACION.md](docs/calidad/VERIFICACION.md#proveedor-del-modelo-en-cada-evidencia).
 La revisión de las respuestas está pendiente de confirmación del equipo.
 Análisis caso por caso en [EVALS.md](docs/evals/EVALS.md).
 
@@ -376,22 +382,22 @@ flowchart LR
   paquetes `.tgz` y sumas de verificación. Publica versiones; no despliega la
   aplicación ([RELEASING.md](docs/calidad/RELEASING.md)).
 
-Cobertura con Redis real, 606 pruebas aprobadas:
+Cobertura con Redis real sobre `c1527bf`, 775 pruebas aprobadas:
 
 | Paquete | Líneas | Ramas | Funciones | Statements |
 | --- | --- | --- | --- | --- |
 | `core` | 97.5 % | 95.5 % | 96.15 % | 97.5 % |
-| `react` | 98.02 % | 97.07 % | 97.67 % | 98.02 % |
-| `embed` | 97.68 % | 97.14 % | 100 % | 97.68 % |
+| `react` | 98.04 % | 97.1 % | 97.67 % | 98.04 % |
+| `embed` | 97.68 % | 97.22 % | 100 % | 97.68 % |
 | `transport-mock` | 96.36 % | 94.54 % | 100 % | 96.36 % |
 | `transport-websocket` | 99.2 % | 94.97 % | 100 % | 99.2 % |
-| `protocol` | 100 % | 100 % | 100 % | 100 % |
-| `agent` | 100 % | 98.54 % | 94.73 % | 100 % |
-| `tmdb` | 99.58 % | 94.74 % | 100 % | 99.58 % |
-| `books` | 100 % | 98.31 % | 100 % | 100 % |
+| `protocol` | 100 % | 98.55 % | 100 % | 100 % |
+| `agent` | 94.84 % | 89.45 % | 98.21 % | 94.84 % |
+| `tmdb` | 99.58 % | 95.07 % | 100 % | 99.58 % |
+| `books` | 100 % | 98.64 % | 100 % | 100 % |
 | `external-api` | 99.65 % | 95.25 % | 100 % | 99.65 % |
-| `apps/api` | 100 % | 96.46 % | 100 % | 100 % |
-| `apps/mcp-server` | 98.59 % | 95.62 % | 93.93 % | 98.59 % |
+| `apps/api` | 99.69 % | 96.93 % | 97.29 % | 99.69 % |
+| `apps/mcp-server` | 98.08 % | 95.1 % | 93.93 % | 98.08 % |
 
 **GitHub Flow:**
 
@@ -419,7 +425,7 @@ aprobación registrada. Ver [VERIFICACION.md](docs/calidad/VERIFICACION.md).
 │   ├── transport-mock/       # Transporte simulado de la Fase 1
 │   ├── transport-websocket/  # Transporte WebSocket real
 │   ├── protocol/             # Protocolo v1 validado con zod
-│   ├── agent/                # MovieAgent, OllamaModel, McpGateway y políticas
+│   ├── agent/                # MovieAgent, OllamaModel, GroqModel, McpGateway y políticas
 │   ├── tmdb/                 # Cliente TMDB
 │   ├── books/                # Cliente Google Books y comparación
 │   └── external-api/         # Caché, cuotas y fetch resiliente
@@ -457,7 +463,8 @@ Cada paquete expone su API pública desde `src/index.ts`.
 | `pnpm dev:api` | Compila las dependencias e inicia la API |
 | `pnpm dev:mcp` | Compila las dependencias e inicia el servidor MCP |
 | `pnpm eval:agent` | Ejecuta las 31 evals deterministas del agente |
-| `pnpm eval:agent:live` | Ejecuta las 30 evals reales (requiere `RUN_LIVE_EVALS=1`, Ollama y MCP) |
+| `pnpm eval:agent:live` | Ejecuta las 30 evals reales con Ollama o Groq según `AGENT_MODE` (requiere `RUN_LIVE_EVALS=1` y el MCP) |
+| `pnpm eval:conversations:live` | Conversaciones multivuelta y comparaciones generales reales (requiere `RUN_LIVE_EVALS=1`) |
 | `pnpm evidence:tmdb:live` | Genera evidencia de uso real de TMDB (requiere `RUN_LIVE_TMDB=1`) |
 | `pnpm lint` | ESLint sin advertencias |
 | `pnpm release:prepare` | Genera los artefactos de distribución |
@@ -472,8 +479,8 @@ Cada paquete expone su API pública desde `src/index.ts`.
 | Sección | Documentos |
 | --- | --- |
 | Arquitectura | [Alto nivel](docs/arquitectura/ALTO-NIVEL.md), [Agente](docs/arquitectura/AGENTE.md), [Escalabilidad](docs/arquitectura/ESCALABILIDAD.md), [Protocolo](docs/arquitectura/PROTOCOLO.md), [Caché y cuotas](docs/arquitectura/CACHE-Y-CUOTAS.md) |
-| Manuales | [Instalación](docs/manuales/INSTALACION.md), [Configuración](docs/manuales/CONFIGURACION.md), [Arranque](docs/manuales/ARRANQUE.md), [Proveedores](docs/manuales/PROVEEDORES.md), [Despliegue](docs/manuales/DESPLIEGUE.md), [Servidor MCP](docs/manuales/SERVIDOR-MCP.md), [Widget y SDK](docs/manuales/WIDGET-SDK.md) |
-| Evals | [Evals](docs/evals/EVALS.md), [Escenarios TMDB](docs/evals/ESCENARIOS-TMDB.md), [Resultados](docs/evals/resultados/) |
+| Manuales | [Instalación](docs/manuales/INSTALACION.md), [Configuración](docs/manuales/CONFIGURACION.md), [Arranque](docs/manuales/ARRANQUE.md), [Proveedores](docs/manuales/PROVEEDORES.md), [Despliegue](docs/manuales/DESPLIEGUE.md), [Servidor MCP](docs/manuales/SERVIDOR-MCP.md), [Widget y SDK](docs/manuales/WIDGET-SDK.md), [Inicio con Groq](docs/GROQ-INICIO.md) |
+| Evals | [Evals](docs/evals/EVALS.md), [Escenarios TMDB](docs/evals/ESCENARIOS-TMDB.md), [Resultados](docs/evals/resultados/), [Rendimiento y modelos Groq](docs/AGENTE-RENDIMIENTO.md), [Comparaciones generales](docs/AGENTE-COMPARACIONES.md), [Evidencia de libros](docs/BOOKS-EVIDENCIA.md) |
 | Calidad | [Verificación](docs/calidad/VERIFICACION.md), [CI/CD y SVN](docs/calidad/CI-CD-Y-SVN.md), [Releases](docs/calidad/RELEASING.md) |
 | Entrega | [Matriz de requisitos](docs/entrega/MATRIZ-REQUISITOS.md), [Guion de la demo](docs/entrega/GUION-DEMO.md), [Limitaciones](docs/entrega/LIMITACIONES.md) |
 
@@ -507,10 +514,14 @@ agénticas en [AGENTS.md](AGENTS.md).
 - No hay despliegue público: todo se ejecuta en local.
 - CI no se ejecuta en GitHub desde el 6 de noviembre por un bloqueo de
   facturación de la cuenta.
-- `safeOutput` rechaza respuestas legítimas cuando el modelo copia URLs de TMDB o
-  parafrasea el aviso de datos externos.
-- Ollama es el cuello de botella; las cuotas de los proveedores no escalan.
-- La comparación solo confirma la adaptación de Dune (2021).
+- En `ccd40d9`, `safeOutput` rechazaba respuestas legítimas cuando el modelo
+  copiaba URLs de TMDB. `main` reduce las URLs del contexto; en la medición
+  repetida, 8 de 8 turnos fueron correctos.
+- El modelo es el cuello de botella; las cuotas de los proveedores no escalan.
+- La comparación se apoya en un registro revisado (Dune y The Hunger Games) y en
+  Wikidata, una fuente comunitaria.
+- Las evidencias se repartieron entre Ollama y Groq y no se repitieron con el otro
+  proveedor.
 - Las evals reales son una sola ejecución y su revisión está pendiente de
   confirmación.
 

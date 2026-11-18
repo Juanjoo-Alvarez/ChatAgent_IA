@@ -28,7 +28,7 @@ flowchart LR
         API1["API réplica A :8000"]
         API2["API réplica B :8002"]
         AG["MovieAgent"]
-        OLL["Ollama :11434"]
+        OLL["Ollama :11434 o Groq"]
         MCP["Servidor MCP :8001"]
         PX --> API1
         PX --> API2
@@ -46,6 +46,7 @@ flowchart LR
     subgraph Externos["Proveedores externos"]
         TMDB["TMDB API"]
         GB["Google Books API"]
+        WD["Wikidata"]
         IMDB["IMDb"]
         GBW["Google Books web"]
     end
@@ -57,6 +58,7 @@ flowchart LR
     MCP --> R2
     MCP --> TMDB
     MCP --> GB
+    MCP --> WD
     RCT -. "abre pestaña validada" .-> IMDB
     RCT -. "abre pestaña validada" .-> GBW
 ```
@@ -70,6 +72,11 @@ Notas sobre el diagrama:
 - En local la conexión es `ws://`, sin TLS. `wss://` es un requisito de un
   despliegue público, que no existe (ver [DESPLIEGUE.md](../manuales/DESPLIEGUE.md)).
 - Las dos cajas de Redis son la misma instancia, con prefijos de clave distintos.
+- El modelo puede ser Ollama local (`AGENT_MODE=ollama`, valor predeterminado) o
+  Groq alojado (`AGENT_MODE=groq`). Con Groq, la API llama a un servicio externo y
+  Ollama deja de ser necesario. Las herramientas se ejecutan siempre en el
+  servidor MCP propio.
+- Para comparar películas con libros, el MCP también consulta Wikidata.
 
 ## Diagrama de despliegue local
 
@@ -122,7 +129,7 @@ flowchart TB
 | `packages/transport-mock` | Transporte simulado de la Fase 1 | TypeScript | No | No aplica |
 | `packages/transport-websocket` | Sesión HTTP, WebSocket, reconexión acotada y cancelación | WebSocket del navegador | Credenciales en memoria | No aplica |
 | `packages/protocol` | Protocolo v1, validadores y gramática de apertura de referencias | zod | No | Biblioteca compartida |
-| `packages/agent` | `MovieAgent`, `OllamaModel`, `McpGateway`, políticas y evaluación | TypeScript, SDK MCP, Ajv | No | Se replica con la API |
+| `packages/agent` | `MovieAgent`, `OllamaModel`, `GroqModel`, `McpGateway`, políticas y evaluación | TypeScript, SDK MCP, Ajv | No | Se replica con la API |
 | `packages/tmdb` | Cliente TMDB, normalización y validación | fetch, zod | No (usa la caché inyectada) | Biblioteca |
 | `packages/books` | Cliente Google Books y comparación película–libro | fetch, zod | No (usa la caché inyectada) | Biblioteca |
 | `packages/external-api` | Caché read-through, cuotas atómicas, reintentos y fetch resiliente | Memoria o Redis (Lua) | En Redis o en memoria | Sí, con Redis |
@@ -130,6 +137,7 @@ flowchart TB
 | `apps/mcp-server` | Servidor MCP con 6 herramientas | SDK MCP, Streamable HTTP sin sesión | Caché y cuotas en Redis o memoria | Sí, con `SHARED_STORE=redis` |
 | `apps/demo` | Demo de cine que consume el SDK | Vite | No | Sitio estático |
 | Ollama | Inferencia del modelo `qwen3:4b-instruct-2507-q4_K_M` | Ollama local | Modelo en memoria | No en esta entrega |
+| Groq (opcional) | Inferencia alojada, `openai/gpt-oss-120b` por defecto | API HTTPS de Groq, plan gratuito | No | Lo gestiona el proveedor, limitado por su cuota |
 | Redis | Estado compartido | Redis 7.4 | Sí | Una instancia en local |
 
 ## Decisiones de arquitectura
@@ -142,6 +150,7 @@ flowchart TB
 | Un solo servidor MCP | Dos servidores, uno de películas y otro de libros (plan inicial) | Comparten transporte, logs, caché y política de cuotas; `compare_movie_book` necesita ambos catálogos | Separar dominios en varios servidores es posible a futuro sin cambiar el agente |
 | Redis para estado compartido | Sesiones pegajosas; base de datos relacional | Operaciones atómicas en Lua para leases y cuotas; TTL nativo | Sin Redis no hay varias réplicas: con `memory` cada proceso tiene su propio estado |
 | Ollama local detrás del puerto `LanguageModel` | Proveedor en la nube | Sin costo y sin registrar tarjeta | Ollama es el cuello de botella de cómputo; otro proveedor solo requiere otro adaptador de `LanguageModel` |
+| Groq como segundo adaptador de `LanguageModel` | Solo Ollama | Inferencia más rápida sin depender del equipo local, sin tarjeta | Depende de la cuota gratuita (`rate_limited`) y envía las conversaciones a un servicio externo |
 | Acciones de navegación ejecutadas por el cliente y validadas por el servidor | Que el LLM genere enlaces | El LLM no puede producir URLs (`safeOutput` las rechaza); la API comprueba que la acción coincida con la petición del usuario | La pestaña se abre sin clic en un enlace y solo hacia IMDb o Google Books |
 
 ## Por qué escala
@@ -153,7 +162,8 @@ flowchart TB
   se comparten en Redis con operaciones atómicas.
 - **Límites por réplica.** `MAX_CONNECTIONS` y `MAX_CONCURRENT_TURNS` protegen
   cada proceso. Para agregar capacidad se agregan réplicas.
-- **Lo que no escala** en esta entrega es Ollama (un proceso en un equipo) y las
+- **Lo que no escala** en esta entrega es el modelo (Ollama es un proceso en un
+  equipo y Groq está limitado por su cuota gratuita) y las
   cuotas de los proveedores, que no aumentan con más réplicas.
 
 El análisis completo y las mediciones están en [ESCALABILIDAD.md](./ESCALABILIDAD.md).

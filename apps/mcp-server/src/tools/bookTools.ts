@@ -1,7 +1,8 @@
-import { BooksError, bookIdSchema, bookSchema, compareInput, compareMovieBook, comparisonSchema, searchBooksInput, type GoogleBooksClient } from "@agichat/books";
+import { BooksError, bookIdSchema, bookSchema, compareInput, MovieBookService, comparisonSchema, searchBooksInput, type AdaptationLookup, type GoogleBooksClient } from "@agichat/books";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { TmdbError } from "@agichat/tmdb";
 import type { MovieCatalog } from "./movieTools.js";
 import { toErrorPayload, toolErrorResult } from "./toolErrors.js";
 
@@ -17,15 +18,21 @@ async function run(operation: () => Promise<Record<string, unknown>>): Promise<C
   } catch (error) {
     if (error instanceof BooksError) {
       return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: {
-        code: error.code, message: "No se pudo completar la consulta de Google Books.", retryable: error.retryable,
+        code: error.code, message: error.source === "wikidata" ? "No se pudo comprobar la obra de origen en Wikidata." : "No se pudo completar la consulta de Google Books.", retryable: error.retryable,
+        ...(error.source === "wikidata" ? { source: "wikidata" } : {}),
         retry_after_ms: null, details: null
       } }) }] };
+    }
+    if (error instanceof TmdbError) {
+      const payload = toErrorPayload(error);
+      return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: { ...payload.error, source: "tmdb" } }) }] };
     }
     return toolErrorResult(toErrorPayload(error));
   }
 }
 
-export function registerBookTools(server: McpServer, books: BookCatalog, movies: MovieCatalog): void {
+export function registerBookTools(server: McpServer, books: BookCatalog, movies: MovieCatalog, adaptations?: AdaptationLookup): void {
+  const comparison = new MovieBookService(movies, books, adaptations);
   server.registerTool("search_books", {
     description: `Busca libros y devuelve candidatos, no adaptaciones confirmadas. ${BOOK_CONTENT_NOTICE}`,
     inputSchema: searchBooksInput,
@@ -40,10 +47,9 @@ export function registerBookTools(server: McpServer, books: BookCatalog, movies:
     return { book, references: [book.reference], content_notice: BOOK_CONTENT_NOTICE };
   }));
   server.registerTool("compare_movie_book", {
-    description: `Recupera película y libro por ID, verifica asociación y compara con fuentes y límites. No acepta evidencia aportada por el modelo. ${BOOK_CONTENT_NOTICE}`,
+    description: `Compara por movie_id de TMDB. Omite book_id para descubrir la obra de origen y buscar su edición automáticamente. Inclúyelo solo para un libro concreto. No acepta evidencia aportada por el modelo. ${BOOK_CONTENT_NOTICE}`,
     inputSchema: compareInput, outputSchema: comparisonSchema, annotations
   }, (args) => run(async () => {
-    const [movie, book] = await Promise.all([movies.getMovieDetails(args.movie_id), books.getBookDetails(args.book_id)]);
-    return compareMovieBook(movie, book, args.preferences);
+    return comparison.compare(args);
   }));
 }

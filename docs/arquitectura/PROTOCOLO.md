@@ -66,7 +66,7 @@ tiene 43 caracteres base64url. El servidor guarda solo su hash SHA-256.
 
 | Tipo | Campos relevantes | Uso del cliente |
 | --- | --- | --- |
-| `session-ready` | `sessionId`, `notice`, `mode` (`ollama` o `fixture`) | Confirmar la autenticación y mostrar capacidades |
+| `session-ready` | `sessionId`, `notice`, `mode` (`ollama`, `groq` o `fixture`) | Confirmar la autenticación y mostrar capacidades |
 | `agent-typing` | `requestId`, `isTyping` | Indicador de escritura por petición |
 | `agent-message` | `requestId`, `message`, `movies`, `references`, `actions` | Renderizar texto, tarjetas y acciones validadas |
 | `error` | `requestId` opcional, `code`, `message`, `retryable` | Mostrar el error sin perder la correlación |
@@ -79,6 +79,9 @@ tiene 43 caracteres base64url. El servidor guarda solo su hash SHA-256.
 - `references` incluye hasta 20 referencias:
   - `{ "provider": "imdb", "id": "tt" + 7 a 10 dígitos }`
   - `{ "provider": "google-books", "id": "[A-Za-z0-9_-]{1,128}" }`
+- Cada referencia puede incluir `label` (nombre visible, hasta 350 caracteres) y
+  `aliases` (hasta 5 nombres alternativos), que permiten pedir la apertura por
+  nombre. Estos campos se agregaron en `main` después de `ccd40d9`.
 - `actions` admite como máximo una acción `open-reference`.
 
 El protocolo no implementa streaming de tokens. La respuesta llega completa.

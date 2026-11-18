@@ -30,6 +30,7 @@ function startConversation(): void {
     unmount = mountChatWidget(root, {
       transport,
       layout: "full",
+      showTmdbCredits: true,
       title: "Hablemos de cine",
       welcomeTitle: "¿Qué vemos hoy?",
       emptyStateMessage: "Soy Sofía, tu compañera de cine. Puedo recomendarte películas y compararlas con sus libros para decidir si vale la pena verlas.",

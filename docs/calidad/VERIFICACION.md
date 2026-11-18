@@ -7,8 +7,9 @@ verificado de lo que sigue pendiente. Cada número sale de un comando ejecutado.
 
 | Dato | Valor |
 | --- | --- |
-| Fecha | 17 de noviembre de 2026 |
-| Commit | `ccd40d9` (rama `docs/documentacion`, sin cambios de código) |
+| Fecha | 18 de noviembre de 2026 |
+| Código medido | `main` en `c1527bf` (con Groq, Wikidata y los ajustes del agente) más la documentación de la rama `docs/documentacion` |
+| Medición anterior | 17 de noviembre sobre `ccd40d9`: 606 pruebas. Se repitió tras integrar `main` |
 | Sistema | Windows 11 Home Single Language 10.0.26200 |
 | CPU | AMD Ryzen 7 260 w/ Radeon 780M Graphics, 8 núcleos y 16 hilos |
 | RAM | 15.3 GB |
@@ -18,6 +19,32 @@ verificado de lo que sigue pendiente. Cada número sale de un comando ejecutado.
 | Docker | 29.8.2 |
 | Ollama | 0.40.16 |
 | Redis | `redis:7.4-alpine` de `compose.yaml` |
+
+## Proveedor del modelo en cada evidencia
+
+El agente admite dos proveedores de modelo detrás del puerto `LanguageModel`:
+**Ollama** local (`qwen3:4b-instruct-2507-q4_K_M`, valor predeterminado de
+`AGENT_MODE`) y **Groq** alojado (`AGENT_MODE=groq`, con `openai/gpt-oss-120b`
+como modelo predeterminado). El proyecto empezó a validarse con Ollama y después
+incorporó Groq. Las evidencias no se repitieron con el otro proveedor. Esta tabla
+indica con qué se hizo cada una:
+
+| Evidencia | Proveedor del modelo | Base de código | Documento |
+| --- | --- | --- | --- |
+| 30 evals reales (`promptVersion: "v1"`) | **Ollama**, `qwen3:4b-instruct-2507-q4_K_M` | `ccd40d9` | [EVALS.md](../evals/EVALS.md) |
+| Medición C de escalabilidad (extremo a extremo con 2 réplicas) | **Ollama** | `ccd40d9` y repetida sobre `c1527bf` | [ESCALABILIDAD.md](../arquitectura/ESCALABILIDAD.md#mediciones) |
+| Capturas del producto y guion de la demo | **Ollama** | `ccd40d9` | [GUION-DEMO.md](../entrega/GUION-DEMO.md) |
+| Traza que explica los rechazos de `safeOutput` | **Ollama** | `ccd40d9` | [LIMITACIONES.md](../entrega/LIMITACIONES.md) |
+| Diagnóstico de rendimiento del agente local | **Ollama** | Posterior a `ccd40d9` | [AGENTE-RENDIMIENTO.md](../AGENTE-RENDIMIENTO.md) |
+| Comparación de modelos del 18 de noviembre | **Groq** (`openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `qwen/qwen3.8-27b`), con Ollama como referencia | Posterior a `ccd40d9` | [AGENTE-RENDIMIENTO.md](../AGENTE-RENDIMIENTO.md#comparación-de-modelos-groq) |
+| Conversaciones multivuelta y comparaciones generales con Wikidata (`pnpm eval:conversations:live`) | **Groq** | Posterior a `ccd40d9` | [AGENTE-COMPARACIONES.md](../AGENTE-COMPARACIONES.md) |
+| Integración con Groq y su configuración | **Groq** | Posterior a `ccd40d9` | [GROQ-INICIO.md](../GROQ-INICIO.md) |
+| Evidencia real de libros con Google Books | Ninguno: no usa LLM | Posterior a `ccd40d9` | [BOOKS-EVIDENCIA.md](../BOOKS-EVIDENCIA.md) |
+| Mediciones A y B de escalabilidad (modo fixture) | Ninguno: dobles deterministas | `c1527bf` | [ESCALABILIDAD.md](../arquitectura/ESCALABILIDAD.md#mediciones) |
+| Pruebas automatizadas, cobertura y evals deterministas | Ninguno: dobles deterministas | `c1527bf` | Este documento |
+
+Las 30 evals reales con Groq no forman parte de las evidencias. Para ejecutarlas,
+consulta [GROQ-INICIO.md](../GROQ-INICIO.md#prueba-real-y-evals).
 
 ## Estado de CI en GitHub
 
@@ -50,10 +77,9 @@ cumplió en todos.
 | `pnpm lint` | Aprobado |
 | `pnpm build` | Aprobado |
 | `pnpm typecheck` | Aprobado |
-| `pnpm test:coverage` con `REDIS_URL=redis://localhost:6379` | **606 pruebas aprobadas, 0 omitidas, 0 fallidas** |
-| `pnpm test:coverage` sin Redis | 600 aprobadas y 6 omitidas (las de integración con Redis) |
+| `pnpm test:coverage` con `REDIS_URL=redis://localhost:6379` | **775 pruebas aprobadas, 0 omitidas, 0 fallidas** |
 | `pnpm eval:agent` | 31 de 31 aprobados |
-| `pnpm test:widget` | 9 de 9 aprobados, en 3 archivos |
+| `pnpm test:widget` | 12 de 12 aprobados, en 3 archivos |
 | `pnpm test:compose` | 3 de 3 aprobados |
 
 ## Cobertura por paquete
@@ -64,24 +90,26 @@ paquete. El umbral mínimo es 80 % en las cuatro métricas.
 | Paquete | Pruebas | Líneas | Ramas | Funciones | Statements |
 | --- | --- | --- | --- | --- | --- |
 | `packages/core` | 25 | 97.5 % | 95.5 % | 96.15 % | 97.5 % |
-| `packages/react` | 84 | 98.02 % | 97.07 % | 97.67 % | 98.02 % |
-| `packages/embed` | 19 | 97.68 % | 97.14 % | 100 % | 97.68 % |
+| `packages/react` | 90 | 98.04 % | 97.1 % | 97.67 % | 98.04 % |
+| `packages/embed` | 21 | 97.68 % | 97.22 % | 100 % | 97.68 % |
 | `packages/transport-mock` | 7 | 96.36 % | 94.54 % | 100 % | 96.36 % |
 | `packages/transport-websocket` | 72 | 99.2 % | 94.97 % | 100 % | 99.2 % |
-| `packages/protocol` | 36 | 100 % | 100 % | 100 % | 100 % |
-| `packages/agent` | 82 | 100 % | 98.54 % | 94.73 % | 100 % |
-| `packages/tmdb` | 84 | 99.58 % | 94.74 % | 100 % | 99.58 % |
-| `packages/books` | 20 | 100 % | 98.31 % | 100 % | 100 % |
+| `packages/protocol` | 57 | 100 % | 98.55 % | 100 % | 100 % |
+| `packages/agent` | 178 | 94.84 % | 89.45 % | 98.21 % | 94.84 % |
+| `packages/tmdb` | 90 | 99.58 % | 95.07 % | 100 % | 99.58 % |
+| `packages/books` | 36 | 100 % | 98.64 % | 100 % | 100 % |
 | `packages/external-api` | 57 | 99.65 % | 95.25 % | 100 % | 99.65 % |
-| `apps/api` | 54 | 100 % | 96.46 % | 100 % | 100 % |
-| `apps/mcp-server` | 66 | 98.59 % | 95.62 % | 93.93 % | 98.59 % |
-| **Total** | **606** | | | | |
+| `apps/api` | 69 | 99.69 % | 96.93 % | 97.29 % | 99.69 % |
+| `apps/mcp-server` | 73 | 98.08 % | 95.1 % | 93.93 % | 98.08 % |
+| **Total** | **775** | | | | |
 
 `apps/demo` no tiene pruebas unitarias: solo compone APIs públicas ya probadas,
 como permite `AGENTS.md`. Pasa lint, typecheck y build.
 
-Sin Redis, las ramas de `apps/api` bajan a 94.17 %, porque no se ejecutan las
-pruebas de integración. El resto de las métricas no cambia de forma relevante.
+Respecto de `ccd40d9` hay 169 pruebas más, sobre todo en `packages/agent` (de 82 a
+178), por Groq, el estado de conversación y la verificación de respuestas. La
+cobertura de ramas de `packages/agent` bajó de 98.54 % a 89.45 %, y sigue por
+encima del umbral del 80 %.
 
 ## Pruebas con Redis real
 
@@ -129,7 +157,7 @@ sustituidos. No equivalen a una eval del modelo real.
 | --- | --- | --- |
 | Evals reales con Ollama y MCP | Una ejecución, 25 de 30 casos aprobados | [EVALS.md](../evals/EVALS.md) |
 | Dos réplicas con Redis (modo fixture) | Medido | [ESCALABILIDAD.md](../arquitectura/ESCALABILIDAD.md#mediciones) |
-| Extremo a extremo con el LLM real, 2 réplicas y proxy | Medido: 8 turnos, p50 3.64 s | [ESCALABILIDAD.md](../arquitectura/ESCALABILIDAD.md#mediciones) |
+| Extremo a extremo con el LLM real, 2 réplicas y proxy | Medido con Ollama sobre `c1527bf`: 8 de 8 turnos correctos, p50 1.18 s, 26 solicitudes a TMDB | [ESCALABILIDAD.md](../arquitectura/ESCALABILIDAD.md#mediciones) |
 | Capturas del producto en Chromium con datos reales | 11 capturas; la pestaña de IMDb y CI en verde quedan pendientes | [GUION-DEMO.md](../entrega/GUION-DEMO.md) |
 | Consumo del MCP desde un cliente TypeScript y por HTTP | Verificado | [SERVIDOR-MCP.md](../manuales/SERVIDOR-MCP.md#consumo-desde-otros-clientes) |
 | `pnpm evidence:tmdb:live` | **Pendiente** | [PROVEEDORES.md](../manuales/PROVEEDORES.md#evidencia-de-uso-real-de-tmdb) |

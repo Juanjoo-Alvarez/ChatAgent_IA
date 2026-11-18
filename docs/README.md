@@ -3,6 +3,10 @@
 Índice de toda la documentación del proyecto. El punto de entrada general es el
 [README del repositorio](../README.md).
 
+Las evidencias se obtuvieron con dos proveedores de modelo, Ollama y Groq. La
+tabla que indica cuál se usó en cada una está en
+[VERIFICACION.md](./calidad/VERIFICACION.md#proveedor-del-modelo-en-cada-evidencia).
+
 ## Arquitectura
 
 | Documento | Descripción | Para quién |
@@ -24,6 +28,7 @@
 | [DESPLIEGUE.md](./manuales/DESPLIEGUE.md) | Qué está automatizado, demo en Vercel y requisitos para un despliegue público | Operador |
 | [SERVIDOR-MCP.md](./manuales/SERVIDOR-MCP.md) | Contrato de las 6 herramientas y consumo desde otros clientes | Desarrollador nuevo, agente de código |
 | [WIDGET-SDK.md](./manuales/WIDGET-SDK.md) | Integración del widget con React, Web Component e IIFE, tema y transportes | Desarrollador nuevo |
+| [GROQ-INICIO.md](./GROQ-INICIO.md) | Configuración y uso de Groq como proveedor del modelo en lugar de Ollama | Operador, evaluador |
 
 ## Evaluaciones
 
@@ -32,6 +37,10 @@
 | [EVALS.md](./evals/EVALS.md) | Metodología, configuración, resultados y análisis de las evals LLM01 y LLM07 | Evaluador |
 | [ESCENARIOS-TMDB.md](./evals/ESCENARIOS-TMDB.md) | Escenarios de integración del MCP con un TMDB simulado | Desarrollador nuevo |
 | [resultados/](./evals/resultados/) | Copias versionadas de los informes JSON reales | Evaluador |
+| [AGENTE-RENDIMIENTO.md](./AGENTE-RENDIMIENTO.md) | Rendimiento del agente con Ollama y comparación de modelos Groq | Evaluador, operador |
+| [AGENTE-COMPARACIONES.md](./AGENTE-COMPARACIONES.md) | Conversaciones multivuelta y comparaciones generales con Wikidata (pruebas con Groq) | Evaluador, desarrollador nuevo |
+| [BOOKS-EVIDENCIA.md](./BOOKS-EVIDENCIA.md) | Evidencia real de Google Books y de la comparación de Dune | Evaluador |
+| [evidence/](./evidence/) | Informe JSON de la evidencia de libros | Evaluador |
 
 ## Calidad
 

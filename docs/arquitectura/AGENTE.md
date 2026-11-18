@@ -4,7 +4,9 @@ Este documento describe cómo funciona por dentro el agente de películas, cómo
 clasifica y qué controles de seguridad aplica. La implementación está en
 `packages/agent/src/` y la integración con la red en `apps/api/src/server.ts`.
 
-Revisado contra el código del commit `ccd40d9`.
+Revisado contra el código del commit `ccd40d9`. Después se integraron en `main`
+el proveedor Groq, la reducción del contexto de herramientas (`toolContext.ts`) y
+las comparaciones con Wikidata; las notas de este documento indican esos cambios.
 
 ## Clasificación
 
@@ -47,7 +49,11 @@ razonamiento de varios pasos o su propio modelo. Hoy no se justifica.
 
 ## Diagrama 1: ciclo interno de `MovieAgent.respond`
 
-El diagrama sigue el orden real de `packages/agent/src/MovieAgent.ts`.
+El diagrama sigue el orden de `packages/agent/src/MovieAgent.ts` en `ccd40d9`. En
+`main` se mantuvo ese ciclo y se agregaron el estado de la conversación (película
+seleccionada, criterios y candidatas), la verificación de respuestas
+(`grounding.ts`) y la reducción del contexto de herramientas (`toolContext.ts`).
+Esos agregados no están dibujados.
 
 ```mermaid
 flowchart TD
@@ -79,6 +85,10 @@ flowchart TD
 ```
 
 Detalles que el diagrama simplifica:
+
+- El modelo es un puerto (`LanguageModel`). Además de Ollama local,
+  `AGENT_MODE=groq` usa inferencia alojada en Groq y conserva las herramientas
+  MCP. Ver [Inicio con Groq](../GROQ-INICIO.md).
 
 - La validación con Ajv ocurre dentro de `McpGateway.call`. Si los argumentos
   no cumplen el JSON Schema descubierto, el gateway lanza `policy_denied`.
@@ -123,15 +133,15 @@ sequenceDiagram
     M-->>A: content, movies, references y actions
     A->>A: valida acciones contra la petición del usuario
     A->>R: commit del turno (verifica dueño del lease)
-    A-->>T: agent-message
     A->>R: release del lease
+    A-->>T: agent-message
     A-->>T: agent-typing false
     T-->>W: mensaje, tarjetas con póster y referencias
 ```
 
-El servidor envía `agent-message` antes de liberar el lease. Un mensaje enviado
-de inmediato en la misma sesión puede recibir `busy`, que es reintentable. Ver
-[LIMITACIONES.md](../entrega/LIMITACIONES.md).
+El servidor libera el lease antes de enviar `agent-message`. En `ccd40d9` el
+orden era el inverso, y un mensaje enviado de inmediato podía recibir `busy` (ver
+[LIMITACIONES.md](../entrega/LIMITACIONES.md)).
 
 ## Diagrama 3: abrir una referencia sin clic
 
@@ -244,7 +254,8 @@ El contrato completo está en [SERVIDOR-MCP.md](../manuales/SERVIDOR-MCP.md).
 | Tamaño máximo de una respuesta | 6,000 caracteres | `safeOutput` |
 | Tarjetas por respuesta | 5 | `MovieAgent` y protocolo |
 | Referencias por respuesta | 20 | `MovieAgent` y protocolo |
-| Parámetros del modelo | `temperature 0`, `num_predict 1024`, `num_ctx 8192`, `think: false`, sin streaming | `OllamaModel.ts` |
+| Parámetros con Ollama | `temperature 0`, `num_predict 384` (1024 en `ccd40d9`), `num_ctx 8192`, `think: false`, sin streaming | `OllamaModel.ts` |
+| Parámetros con Groq | `temperature 0`, `max_completion_tokens 2048`, `parallel_tool_calls: false`, sin streaming | `GroqModel.ts` |
 | Tiempo por llamada MCP | 10 s | `McpGateway` |
 | Tiempo por turno | `TURN_TIMEOUT_MS` (60 s por defecto; 180 s en la guía de arranque) | `apps/api/src/config.ts` |
 
@@ -265,5 +276,6 @@ Definidos en `packages/protocol/src/protocol.ts`. Los mensajes provienen de
 | `unavailable` | Ollama, MCP o Redis no disponibles | Sí |
 | `policy_denied` | Una política del agente o de la API bloqueó la operación | No |
 | `limit_exceeded` | Se superó un límite de pasos, herramientas o tamaño | No |
+| `rate_limited` | Un proveedor externo, como Groq, aplicó un límite de uso temporal; el mensaje indica cuál. Agregado en `main` | Sí |
 
 El protocolo completo está en [PROTOCOLO.md](./PROTOCOLO.md).

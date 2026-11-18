@@ -1,8 +1,13 @@
 # Guion de la demostración
 
 Guion de unos 5 minutos para mostrar AGIChat funcionando con datos reales. Cada
-paso indica el mensaje exacto, lo que debe verse y su captura. Los mensajes se
-probaron el 17 de noviembre de 2026 con el commit `ccd40d9`.
+paso indica el mensaje exacto, lo que debe verse y su captura. Los mensajes y las
+capturas se probaron el 17 de noviembre de 2026 con el commit `ccd40d9` y el
+proveedor **Ollama** (`qwen3:4b-instruct-2507-q4_K_M`).
+
+Si la demostración se hace con Groq (`AGENT_MODE=groq`, ver
+[GROQ-INICIO.md](../GROQ-INICIO.md)), las respuestas y los tiempos pueden ser
+distintos: con Groq, este guion no se volvió a probar.
 
 ## Preparación
 

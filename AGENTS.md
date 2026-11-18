@@ -14,7 +14,7 @@ depende de la interfaz, la interfaz recibe el transporte mediante
 - `packages/transport-mock`: transporte simulado de la Fase 1.
 - `packages/transport-websocket`: transporte WebSocket real, con sesión, reconexión acotada y cancelación.
 - `packages/protocol`: protocolo de red v1 validado con zod y gramática de apertura de referencias. Lo comparten cliente y servidor.
-- `packages/agent`: `MovieAgent`, `OllamaModel`, `McpGateway`, políticas de seguridad (`policy.ts`) y evaluación (`evaluate.ts`).
+- `packages/agent`: `MovieAgent`, `OllamaModel` (modelo local) y `GroqModel` (modelo alojado, `AGENT_MODE=groq`), `McpGateway`, políticas de seguridad (`policy.ts`) y evaluación (`evaluate.ts`).
 - `packages/tmdb`: cliente de TMDB, normalización y validación.
 - `packages/books`: cliente de Google Books y comparación película–libro.
 - `packages/external-api`: caché read-through, cuotas atómicas en memoria o Redis, reintentos y fetch resiliente.

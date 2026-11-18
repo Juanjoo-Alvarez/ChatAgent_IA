@@ -64,7 +64,7 @@ const unmount = mountChatWidget("#chat", {
   emptyStateMessage: "Puedo recomendarte películas y compararlas con sus libros.",
   placeholder: "¿Qué película tienes en mente?",
   layout: "full",
-  showTmdbCredits: true // la demo no lo activa; recomendado si hay datos de TMDB solo en texto
+  showTmdbCredits: true
 });
 
 // Al retirar el widget:
@@ -194,8 +194,7 @@ El logo se distribuye como URL de datos para funcionar en el bundle IIFE y dentr
 del Shadow DOM.
 
 Los créditos aparecen cuando hay tarjetas de recomendación o cuando se activa
-`showTmdbCredits` (atributo `tmdb-credits`). La demo actual no activa
-`showTmdbCredits`, así que los muestra junto a las tarjetas de recomendación.
+`showTmdbCredits` (atributo `tmdb-credits`). La demo los activa desde el inicio.
 Un integrador que muestre datos de TMDB solo en texto debe activarlo.
 
 ## Apertura de IMDb y Google Books sin clic
@@ -215,8 +214,26 @@ nueva sin pulsar ningún enlace.
 
 Órdenes aceptadas: `Abre IMDb`, `Abre Google Books`, `Open IMDb`,
 `¿Puedes abrir IMDb?`, `¿Podrías abrir Google Books?`, `Can you open IMDb?`,
-con `Por favor` opcional y un identificador opcional después del proveedor. Una
-negación, una orden entre comillas o incrustada en otra frase no autoriza la
+con `Por favor` opcional. También se aceptan:
+
+- El nombre y el año de la obra, como `Abre IMDb de Duna (2021)`, o un
+  identificador después del proveedor cuando dos obras tienen el mismo nombre.
+- Un prefijo de lista, como `1. Abre Google Books de The Hunger Games`.
+- Tras una comparación verificada, el título de la película como nombre del libro:
+  `Abre Google Books del libro de Los juegos del hambre`. Si hay una única
+  referencia de Google Books, también `Abre Google Books del libro que mencionaste`.
+- Referencias al resultado anterior: `Abre IMDb de eso`, `Abre su página en IMDb`
+  y `Abre Google Books de ese libro`.
+
+Las peticiones sin título ni identificador usan las referencias del resultado más
+reciente, no todas las obras acumuladas en la conversación. Abrir una referencia no
+cambia esa selección: después de abrir IMDb se puede pedir el Google Books del
+mismo libro. `Abre eso` requiere una sola referencia entre ambos proveedores en ese
+resultado. Si hay varias, el agente muestra nombres y años para elegir; la
+selección por nombre solo procede cuando identifica una referencia única. Los
+nombres e identificadores explícitos también permiten volver a una obra anterior.
+
+Una negación, una orden entre comillas o incrustada en otra frase no autoriza la
 apertura. Pedir ambas páginas a la vez requiere aclaración.
 
 ### Requisitos del navegador

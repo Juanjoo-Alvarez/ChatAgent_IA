@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { BooksError, normalizeBook } from "@agichat/books";
+import { BooksError, normalizeBook, type AdaptationLookup } from "@agichat/books";
 import { TmdbClient } from "@agichat/tmdb";
 import { createMcpServer } from "../src/server.js";
 import { createApplication } from "../src/app.js";
@@ -18,16 +21,36 @@ const books: BookCatalog = {
 const logger = { info: () => undefined, error: () => undefined };
 const clients: Client[] = [];
 afterEach(async () => { await Promise.all(clients.splice(0).map((client) => client.close())); });
-async function connect(catalog = books) {
+async function connect(catalog = books, adaptations?: AdaptationLookup) {
   const movies = new TmdbClient({ accessToken: "test", fetch: fakeTmdb().fetch });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await createMcpServer({ movies, books: catalog, logger }).connect(serverTransport);
+  await createMcpServer({ movies, books: catalog, logger, adaptations }).connect(serverTransport);
   const client = new Client({ name: "books-test", version: "1" });
   await client.connect(clientTransport);
   clients.push(client);
   return client;
 }
 describe("book MCP integration", () => {
+  it("lists live journeys without credentials and requires explicit activation before using providers", async () => {
+    const run = promisify(execFile);
+    const script = fileURLToPath(new URL("../scripts/agent-journeys-live.mjs", import.meta.url));
+    const env = { ...process.env, RUN_LIVE_EVALS: "0" };
+    const list = await run(process.execPath, [script, "--list"], { env });
+    expect(JSON.parse(list.stdout)).toHaveLength(6);
+    await expect(run(process.execPath, [script], { env })).rejects.toMatchObject({ code: 2 });
+  });
+  it("automatically discovers and compares an authored work through the existing public tool", async () => {
+    const client = await connect(books, { findByMovie: async (movieId) => [{ movieId, titles: ["Dune"], authors: ["Frank Herbert"], sources: ["https://www.wikidata.org/wiki/Q123"] }] });
+    const comparison = await client.callTool({ name: "compare_movie_book", arguments: { movie_id: 501 } });
+    expect(comparison.isError).not.toBe(true);
+    expect(comparison.structuredContent).toMatchObject({ status: "adaptation_identified", book: { id: "dune" }, movie_id: 501 });
+  });
+  it("identifies a failed association provider instead of attributing it to Google Books", async () => {
+    const client = await connect(books, { findByMovie: async () => { throw new BooksError("rate_limited", true, "wikidata"); } });
+    const result = await client.callTool({ name: "compare_movie_book", arguments: { movie_id: 501 } });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain("wikidata");
+  });
   it("discovers all six tools and validates structured book results", async () => {
     const client = await connect();
     const list = await client.listTools();
@@ -68,6 +91,17 @@ describe("book MCP integration", () => {
     expect(() => loadConfig(env)).toThrow("QUOTA_GOOGLE_BOOKS");
     expect(loadConfig({ ...env, QUOTA_GOOGLE_BOOKS: "3/1s" }).quotaPolicies).toHaveProperty("google-books");
     expect(() => loadConfig({ ...env, QUOTA_GOOGLE_BOOKS: "3/1s", GOOGLE_BOOKS_TIMEOUT_MS: "0" })).toThrow("GOOGLE_BOOKS_TIMEOUT_MS");
+  });
+  it.each(["rate_limited", "quota_exhausted", "quota_unavailable", "invalid_credentials"] as const)("exposes controlled %s errors to independent MCP clients", async (code) => {
+    const client = await connect({ ...books,
+      getBookDetails: async () => { throw new BooksError(code, code !== "invalid_credentials"); }
+    });
+    const result = await client.callTool({ name: "get_book_details", arguments: { book_id: "dune" } });
+    expect(result.isError).toBe(true);
+    expect(result.content).toEqual([{ type: "text", text: JSON.stringify({ error: {
+      code, message: "No se pudo completar la consulta de Google Books.",
+      retryable: code !== "invalid_credentials", retry_after_ms: null, details: null
+    } }) }]);
   });
   it("serves books through the real Streamable HTTP application", async () => {
     const config = loadConfig({ TMDB_READ_ACCESS_TOKEN: "test", QUOTA_TMDB: "10/1s", SHARED_STORE: "memory", GOOGLE_BOOKS_ENABLED: "true", QUOTA_GOOGLE_BOOKS: "5/1s" });

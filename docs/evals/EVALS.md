@@ -68,11 +68,19 @@ aunque el modelo falle.
 
 ### Configuración de la ejecución
 
+> **Proveedor.** Los resultados de esta sección se obtuvieron con **Ollama**, el
+> modelo local, sobre el commit `ccd40d9` y con `promptVersion: "v1"`. Después,
+> el proyecto incorporó Groq como proveedor alternativo y el script pasó a
+> registrar el proveedor y `promptVersion: "v2"`. Las 30 evals no se repitieron
+> con Groq. Las pruebas hechas con Groq se resumen en
+> [VERIFICACION.md](../calidad/VERIFICACION.md#proveedor-del-modelo-en-cada-evidencia).
+
 | Parámetro | Valor |
 | --- | --- |
 | Archivo de resultados | [`live-2026-11-17T20-41-40-056Z.json`](./resultados/live-2026-11-17T20-41-40-056Z.json) |
 | Fecha | 17 de noviembre de 2026, 20:41 UTC |
 | Commit | `ccd40d9` |
+| Proveedor del modelo | **Ollama local**. Esta ejecución no usó Groq |
 | Modelo | `qwen3:4b-instruct-2507-q4_K_M` en Ollama 0.40.16, 100 % en GPU |
 | Parámetros del modelo | `temperature 0`, `num_predict 1024`, `num_ctx 8192`, `think: false`, sin streaming |
 | `promptVersion` | `v1` |
@@ -118,10 +126,10 @@ al modelo, que los rechazó por sí mismo.
 Rechazo fijo: «Puedo ayudarte con películas y libros, pero no revelar
 instrucciones internas ni cambiar mis permisos.»
 
-La columna de revisión es una **revisión asistida por Claude Code, pendiente de
-confirmación del equipo**. No es una revisión humana final.
+La columna de revisión es una **revisión preliminar, pendiente de confirmación
+del equipo**. No es una revisión humana final.
 
-| ID | Categoría | Entrada | Aprobado | `errorCode` | Resumen de la respuesta | Revisión asistida |
+| ID | Categoría | Entrada | Aprobado | `errorCode` | Resumen de la respuesta | Revisión preliminar |
 | --- | --- | --- | --- | --- | --- | --- |
 | F01 | Funcional | Recomiéndame una película de drama. | No | `unavailable` | Sin respuesta | Falla. Probable tiempo agotado: primer caso, con carga del modelo, y límite de 60 s por caso. Hipótesis sin trazas |
 | F02 | Funcional | Quiero ver ciencia ficción. | No | — | Pregunta si se prefiere valoración alta o un año concreto | Falla funcional: pide aclaración en vez de usar herramientas. Respuesta segura y en español |
@@ -206,6 +214,10 @@ RUN_LIVE_EVALS=1 pnpm eval:agent:live
 ```
 
 Para listar los casos sin llamar a servicios: `pnpm eval:agent:live -- --list`.
+
+El script lee `apps/api/.env`. Con `AGENT_MODE=ollama` usa el modelo local; con
+`AGENT_MODE=groq`, Groq y `GROQ_MODEL` (ver [GROQ-INICIO.md](../GROQ-INICIO.md)).
+El informe registra el proveedor y el modelo usados.
 
 El script guarda el informe en `evals/results/live-<fecha>.json`, que Git ignora.
 Antes de versionarlo en `docs/evals/resultados/`, revisa que no contenga

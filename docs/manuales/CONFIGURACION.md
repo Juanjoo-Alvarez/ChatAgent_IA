@@ -1,7 +1,8 @@
 # Manual de configuración
 
 Este manual lista todas las variables de entorno de AGIChat. Los valores
-predeterminados se verificaron en el código del commit `ccd40d9`:
+predeterminados se verificaron en el código del commit `ccd40d9` y se
+actualizaron con las variables que agregó después `main` (Groq y Wikidata):
 
 - `apps/api/src/config.ts`
 - `apps/mcp-server/src/config.ts`, `packages/tmdb/src/TmdbClient.ts` y
@@ -22,11 +23,13 @@ Las variables del proceso tienen prioridad sobre el archivo.
 | `CHAT_HOST` | No | `127.0.0.1` | `127.0.0.1` | Interfaz de escucha. Compose usa `0.0.0.0` | No |
 | `CHAT_PORT` | No | `8000` | `8000` | Puerto HTTP y WebSocket (1 a 65535) | No |
 | `CHAT_ALLOWED_ORIGINS` | No | `http://localhost:5173,http://127.0.0.1:5173` | El mismo | Orígenes exactos permitidos, separados por comas | No |
-| `AGENT_MODE` | No | `ollama` | `ollama` | `ollama` usa el modelo real; `fixture` es un doble sin LLM | No |
+| `AGENT_MODE` | No | `ollama` | `ollama` o `groq` | `ollama` usa el modelo local; `groq`, el modelo alojado en Groq; `fixture` es un doble sin LLM | No |
 | `TOOLS_MODE` | No | `mcp` | `mcp` | `mcp` usa el servidor real; `fixture` solo con `AGENT_MODE=fixture` | No |
 | `MCP_URL` | No | `http://127.0.0.1:8001/mcp` | El mismo | Endpoint del servidor MCP | No |
 | `OLLAMA_URL` | No | `http://127.0.0.1:11434` | El mismo | Servidor de Ollama | No |
 | `OLLAMA_MODEL` | No | `qwen3:4b-instruct-2507-q4_K_M` | El mismo | Etiqueta exacta del modelo | No |
+| `GROQ_API_KEY` | Con `AGENT_MODE=groq` | Ninguno | Clave del plan gratuito, sin tarjeta | Credencial de Groq; la API no arranca en modo `groq` sin ella | **Sí** |
+| `GROQ_MODEL` | No | `openai/gpt-oss-120b` | El mismo | Modelo de Groq | No |
 | `SESSION_STORE` | No | `memory` | `redis` | `memory` para una réplica; `redis` para varias | No |
 | `REDIS_URL` | Con `redis` | Ninguno | `redis://127.0.0.1:6379` | Redis compartido | Puede serlo si incluye contraseña |
 | `SESSION_TTL_MS` | No | `1800000` (30 min) | El mismo | Inactividad máxima de una sesión | No |
@@ -55,6 +58,7 @@ cuotas **no tienen valor predeterminado**: si faltan, el servidor no arranca.
 | `QUOTA_GOOGLE_BOOKS` | Si libros está activo | Ninguno | `5/1s,1000/1d` | Presupuesto de solicitudes a Google Books | No |
 | `GOOGLE_BOOKS_API_KEY` | No | Ninguno | Vacío | Clave opcional de Google Books | **Sí** |
 | `GOOGLE_BOOKS_TIMEOUT_MS` | No | `8000` | `8000` | Tiempo máximo por consulta a Google Books | No |
+| `QUOTA_WIKIDATA` | No | `2/1s,300/1d` | El mismo | Presupuesto de consultas a Wikidata, que se usa con libros habilitados | No |
 
 ## Demo (`apps/demo`)
 
@@ -71,8 +75,8 @@ cambiarlas exige reiniciar Vite o compilar de nuevo.
 
 | Variable | Usada por | Descripción |
 | --- | --- | --- |
-| `RUN_LIVE_EVALS` | `pnpm eval:agent:live` | Debe valer `1` para hacer llamadas reales |
-| `OLLAMA_URL`, `OLLAMA_MODEL`, `MCP_URL` | `pnpm eval:agent:live` | Mismos predeterminados que la API |
+| `RUN_LIVE_EVALS` | `pnpm eval:agent:live`, `pnpm eval:conversations:live` | Debe valer `1` para hacer llamadas reales |
+| `AGENT_MODE`, `OLLAMA_URL`, `OLLAMA_MODEL`, `GROQ_API_KEY`, `GROQ_MODEL`, `MCP_URL` | `pnpm eval:agent:live` | Se leen de `apps/api/.env`; `AGENT_MODE` elige Ollama o Groq |
 | `RUN_LIVE_TMDB` | `pnpm evidence:tmdb:live` | Debe valer `1` para consultar TMDB a través del MCP |
 | `REDIS_URL` | `pnpm test:coverage` | Si está definida, se ejecutan las pruebas de integración con Redis real |
 

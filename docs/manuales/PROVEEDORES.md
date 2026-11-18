@@ -1,9 +1,11 @@
 # Manual de proveedores externos
 
-AGIChat consulta dos proveedores de datos: **TMDB** para películas y **Google
-Books** para libros. Este manual explica cómo configurar cada cuenta sin
-registrar tarjetas de crédito, qué cuotas usa el proyecto, qué atribución exige
-cada proveedor y cómo obtener evidencia de uso real.
+AGIChat consulta tres fuentes de datos: **TMDB** para películas, **Google Books**
+para libros y **Wikidata** para identificar la obra de origen de una película.
+Opcionalmente, usa **Groq** como proveedor del modelo en lugar de Ollama local.
+Este manual explica cómo configurar cada cuenta sin registrar tarjetas de
+crédito, qué cuotas usa el proyecto, qué atribución exige cada proveedor y cómo
+obtener evidencia de uso real.
 
 Las condiciones de los proveedores pueden cambiar. Confírmalas en su
 documentación oficial antes de cada entrega.
@@ -14,10 +16,13 @@ documentación oficial antes de cada entrega.
 | --- | --- | --- | --- | --- |
 | TMDB | Búsqueda, detalles, pósteres e IMDb | Token de lectura v4 (obligatorio) | No se registró | `QUOTA_TMDB=1000/1d` |
 | Google Books | Búsqueda y detalles de libros | Clave opcional | No se registró | `QUOTA_GOOGLE_BOOKS=5/1s,1000/1d` |
+| Wikidata | Obra de origen y autor de una película | Ninguna | No aplica | `QUOTA_WIKIDATA=2/1s,300/1d` (predeterminado) |
+| Groq (opcional) | Inferencia del modelo con `AGENT_MODE=groq` | Clave de API (obligatoria en ese modo) | No se registró: plan gratuito | La define el plan de Groq |
 
-Las credenciales viven solo en `apps/mcp-server/.env`, que Git ignora. El
-navegador nunca recibe una credencial: el widget habla con la API y solo el
-servidor MCP consulta a los proveedores.
+Las credenciales de datos viven solo en `apps/mcp-server/.env` y la clave de Groq
+en `apps/api/.env`. Git ignora ambos archivos. El navegador nunca recibe una
+credencial: el widget habla con la API y solo el backend consulta a los
+proveedores. La configuración de Groq está en [GROQ-INICIO.md](../GROQ-INICIO.md).
 
 ## TMDB
 
@@ -45,9 +50,9 @@ El componente `packages/react/src/components/TmdbCredits.tsx` muestra el logo
 oficial sin modificar (`tmdbLogo.ts`, copiado en
 [`docs/assets/tmdb-logo.svg`](../assets/tmdb-logo.svg)) junto al aviso. El
 widget lo muestra cuando hay tarjetas de recomendación o cuando se activa
-`showTmdbCredits` (atributo `tmdb-credits` del Web Component). La demo actual
-no activa `showTmdbCredits`, así que los créditos aparecen junto a las tarjetas
-de recomendación.
+`showTmdbCredits` (atributo `tmdb-credits` del Web Component). La demo activa
+`showTmdbCredits`. En `ccd40d9`, la versión de las capturas, no lo activaba y los
+créditos solo aparecían junto a las tarjetas.
 
 - [Requisitos oficiales de atribución](https://developer.themoviedb.org/docs/faq)
 - [Logo original](https://www.themoviedb.org/assets/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg)
@@ -108,11 +113,28 @@ del volumen. No se confía en enlaces recibidos del proveedor.
 ### Comparación película–libro
 
 La comparación no depende solo de Google Books. Un registro revisado en el
-servidor (`VERIFIED_ADAPTATIONS` en `packages/books/src/comparison.ts`) confirma
-qué película adapta qué libro. Hoy contiene **solo Dune (2021), basada en Dune
-de Frank Herbert (1965)**. Para cualquier otra película, la comparación devuelve
-`possible_match` o `insufficient_evidence` con veredicto `undetermined`. Ver
-[LIMITACIONES.md](../entrega/LIMITACIONES.md).
+servidor (`packages/books/src/comparison.ts`) confirma qué película adapta qué
+libro en **Dune (2021)** y **The Hunger Games (2012)**. Para otras películas, el
+MCP busca la obra de origen en Wikidata y una edición coincidente en Google Books
+(ver [AGENTE-COMPARACIONES.md](../AGENTE-COMPARACIONES.md)). Si falta evidencia,
+devuelve `possible_match` o `insufficient_evidence` con veredicto `undetermined`.
+Ver [LIMITACIONES.md](../entrega/LIMITACIONES.md).
+
+## Wikidata
+
+El MCP consulta Wikidata sin clave ni tarjeta cuando `GOOGLE_BOOKS_ENABLED=true`.
+Usa un plazo de cinco segundos, caché de 24 horas y su propio contador de cuota
+(`QUOTA_WIKIDATA`, `2/1s,300/1d` por defecto). Wikidata es una fuente
+comunitaria: sirve para identificar una asociación, no garantiza su exactitud.
+
+## Groq
+
+Groq es opcional y sustituye solo la inferencia de Ollama. La clave se crea en la
+consola de Groq **sin agregar tarjeta**, en el plan gratuito, y se guarda en
+`apps/api/.env` como `GROQ_API_KEY`. Las herramientas se siguen ejecutando en el
+MCP propio: Groq recibe la conversación y los resultados de las herramientas, no
+las credenciales de TMDB ni de Google Books. Los pasos completos están en
+[GROQ-INICIO.md](../GROQ-INICIO.md).
 
 ## Evidencia de uso real de TMDB
 
