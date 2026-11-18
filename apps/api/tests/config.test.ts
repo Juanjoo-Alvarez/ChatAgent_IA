@@ -11,6 +11,8 @@ describe("API configuration", () => {
     expect(loadApiConfig({ OLLAMA_MODEL: " custom-model " }).ollamaModel).toBe("custom-model");
   });
   it.each([
+    { AGENT_MODE: "groq" }, { AGENT_MODE: "groq", GROQ_API_KEY: " " }, { GROQ_MODEL: " " },
+    { AGENT_MODE: "groq", GROQ_API_KEY: "test", TOOLS_MODE: "fixture" },
     { AGENT_MODE: "invalid" }, { TOOLS_MODE: "invalid" }, { TOOLS_MODE: "fixture" }, { SESSION_STORE: "invalid" }, { SESSION_STORE: "redis" },
     { CHAT_PORT: "0" }, { CHAT_PORT: "65536" }, { TURN_TIMEOUT_MS: "NaN" },
     { MCP_URL: "file:///secret" }, { MCP_URL: "https://user:pass@example.com/mcp" },
@@ -25,11 +27,14 @@ describe("API configuration", () => {
 const apps: ReturnType<typeof createApi>[] = [];
 afterEach(async () => { connected.splice(0).forEach((ws) => ws.terminate()); await Promise.all(apps.splice(0).map((app) => app.stop())); });
 describe("composition without external services", () => {
-  it.each(["fixture", "ollama"])("starts in %s mode without calling providers before a request", async (mode) => {
-    const app = createApi({ ...loadApiConfig({ AGENT_MODE: mode }), port: 0 });
+  it.each(["fixture", "ollama", "groq"])("starts in %s mode without calling providers before a request", async (mode) => {
+    const app = createApi({ ...loadApiConfig({ AGENT_MODE: mode, GROQ_API_KEY: "test-key" }), port: 0 });
     apps.push(app);
     const address = await app.start();
     expect((await fetch(`http://127.0.0.1:${address.port}/healthz`)).status).toBe(200);
+    const response = await fetch(`http://127.0.0.1:${address.port}/sessions`, { method: "POST", headers: { Origin: "http://localhost:5173" } });
+    const credentials = await response.json() as { version: 1; sessionId: string; token: string; expiresInSeconds: number; websocketPath: "/chat" };
+    await authenticated(`http://127.0.0.1:${address.port}`, credentials);
   });
   it("reports a port conflict", async () => {
     const app = createApi({ ...loadApiConfig({}), port: 0 }); apps.push(app);

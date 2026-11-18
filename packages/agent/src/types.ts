@@ -1,11 +1,12 @@
 import type { MovieCard, Reference } from "@agichat/protocol";
 
-export interface ToolCall { readonly name: string; readonly arguments: Record<string, unknown> }
+export interface ToolCall { readonly id?: string; readonly name: string; readonly arguments: Record<string, unknown> }
 export interface ModelMessage {
   readonly role: "system" | "user" | "assistant" | "tool";
   readonly content: string;
   readonly toolCalls?: readonly ToolCall[];
   readonly toolName?: string;
+  readonly toolCallId?: string;
 }
 export interface ToolDefinition {
   readonly name: string;
@@ -44,7 +45,7 @@ export interface ChatAgent {
 }
 
 export class AgentError extends Error {
-  public constructor(public readonly code: "policy_denied" | "limit_exceeded" | "unavailable") {
+  public constructor(public readonly code: "policy_denied" | "limit_exceeded" | "unavailable" | "rate_limited") {
     super(code);
     this.name = "AgentError";
   }

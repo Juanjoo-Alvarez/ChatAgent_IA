@@ -9,7 +9,7 @@
     "dev:api": "pnpm --filter @agichat/api... build && pnpm --filter @agichat/api dev",
     "dev:mcp": "pnpm --filter @agichat/mcp-server... build && pnpm --filter @agichat/mcp-server dev",
     "eval:agent": "pnpm --filter @agichat/agent eval",
-    "eval:agent:live": "pnpm --filter @agichat/agent... build && node scripts/eval-agent-live.mjs",
+    "eval:agent:live": "pnpm --filter @agichat/agent... build && node --env-file-if-exists=apps/api/.env scripts/eval-agent-live.mjs",
     "evidence:tmdb:live": "pnpm --filter @agichat/mcp-server evidence:live",
     "lint": "eslint . --max-warnings 0",
     "release:prepare": "pnpm build && node scripts/prepare-release.mjs stage && pnpm --filter \"./packages/*\" pack --recursive --pack-destination release-artifacts && node scripts/prepare-release.mjs checksum",

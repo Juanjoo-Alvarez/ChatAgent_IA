@@ -1,4 +1,4 @@
-import { FixtureModel, McpGateway, MovieAgent, OllamaModel } from "@agichat/agent";
+import { FixtureModel, GroqModel, McpGateway, MovieAgent, OllamaModel } from "@agichat/agent";
 import { Redis } from "ioredis";
 
 import type { ApiConfig } from "./config.js";
@@ -12,7 +12,9 @@ export function createApi(config: ApiConfig) {
   // No imprimir excepciones Redis: pueden contener datos de conexión.
   redis?.on("error", () => undefined);
   const store = redis === null ? new InMemorySessionStore() : new RedisSessionStore(redis);
-  const model = config.mode === "fixture" ? new FixtureModel() : new OllamaModel({ url: config.ollamaUrl, model: config.ollamaModel });
+  const model = config.mode === "fixture" ? new FixtureModel() : config.mode === "groq"
+    ? new GroqModel({ apiKey: config.groqApiKey, model: config.groqModel })
+    : new OllamaModel({ url: config.ollamaUrl, model: config.ollamaModel });
   const gateway = config.toolsMode === "fixture" ? new FixtureGateway() : new McpGateway(config.mcpUrl);
   const server = createChatServer(config, new MovieAgent(model, gateway), store);
   return {

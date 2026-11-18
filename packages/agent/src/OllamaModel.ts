@@ -18,7 +18,7 @@ export class OllamaModel implements LanguageModel {
       method: "POST", headers: { "Content-Type": "application/json" }, signal,
       body: JSON.stringify({
         model: this.options.model, stream: false, think: false,
-        options: { temperature: 0, num_predict: 1024, num_ctx: 8192 },
+        options: { temperature: 0, num_predict: 384, num_ctx: 8192 },
         messages: messages.map((message) => ({
           role: message.role, content: message.content,
           ...(message.toolName === undefined ? {} : { tool_name: message.toolName }),

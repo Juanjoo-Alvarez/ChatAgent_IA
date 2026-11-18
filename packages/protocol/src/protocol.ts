@@ -44,11 +44,11 @@ export type UserMessageFrame = Extract<ClientFrame, { type: "user-message" }>;
 
 export const errorCodeSchema = z.enum([
   "invalid_frame", "unauthorized", "session_expired", "busy", "duplicate_request",
-  "timeout", "cancelled", "unavailable", "policy_denied", "limit_exceeded"
+  "timeout", "cancelled", "unavailable", "policy_denied", "limit_exceeded", "rate_limited"
 ]);
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 export const serverFrameSchema = z.discriminatedUnion("type", [
-  z.strictObject({ ...base, type: z.literal("session-ready"), sessionId: id, notice: z.string(), mode: z.enum(["ollama", "fixture"]) }),
+  z.strictObject({ ...base, type: z.literal("session-ready"), sessionId: id, notice: z.string(), mode: z.enum(["ollama", "groq", "fixture"]) }),
   z.strictObject({ ...base, type: z.literal("agent-typing"), requestId: id, isTyping: z.boolean() }),
   z.strictObject({
     ...base, type: z.literal("agent-message"), requestId: id,

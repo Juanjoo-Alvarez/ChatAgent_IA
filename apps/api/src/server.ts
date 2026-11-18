@@ -71,7 +71,7 @@ export function createChatServer(config: ApiConfig, agent: ChatAgent, store: Ses
     const send = (frame: ServerFrame) => { if (ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(serverFrameSchema.parse(frame))); } };
     const error = (code: ErrorCode, requestId?: string) => send({
       version: 1, type: "error", ...(requestId === undefined ? {} : { requestId }), code,
-      message: ({ invalid_frame: "Mensaje inválido.", unauthorized: "Sesión no autorizada.", session_expired: "La sesión expiró.", busy: "Hay una solicitud en curso. Intenta nuevamente.", duplicate_request: "El identificador ya se utilizó para otra solicitud.", timeout: "La solicitud excedió el tiempo disponible.", cancelled: "Solicitud cancelada.", unavailable: "El servicio no está disponible temporalmente.", policy_denied: "La operación no está permitida.", limit_exceeded: "La solicitud excedió los límites permitidos." })[code],
+      message: ({ invalid_frame: "Mensaje inválido.", unauthorized: "Sesión no autorizada.", session_expired: "La sesión expiró.", busy: "Hay una solicitud en curso. Intenta nuevamente.", duplicate_request: "El identificador ya se utilizó para otra solicitud.", timeout: "La solicitud excedió el tiempo disponible.", cancelled: "Solicitud cancelada.", unavailable: "El servicio no está disponible temporalmente.", rate_limited: "El proveedor de IA alcanzó su cuota de solicitudes o tokens. Espera a que se restablezca la cuota antes de intentar nuevamente.", policy_denied: "La operación no está permitida.", limit_exceeded: "La solicitud excedió los límites permitidos." })[code],
       retryable: ["busy", "timeout", "unavailable"].includes(code)
     });
     const authTimer = setTimeout(() => { ws.close(1008, "Authentication required"); }, 5000);

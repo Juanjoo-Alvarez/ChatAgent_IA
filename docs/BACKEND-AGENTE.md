@@ -1,5 +1,8 @@
 # Backend del agente — integración del proyecto 2
 
+Para usar inferencia alojada, consultar [Inicio con Groq](./GROQ-INICIO.md).
+`AGENT_MODE=groq` conserva las herramientas MCP y evita depender de Ollama local.
+
 Para la primera ejecución con modelo y proveedores reales, seguir
 [Inicio local con Ollama, películas y libros](./OLLAMA-INICIO.md).
 

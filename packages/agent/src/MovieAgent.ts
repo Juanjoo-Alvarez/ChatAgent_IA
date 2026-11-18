@@ -2,6 +2,7 @@ import type { MovieCard, Reference } from "@agichat/protocol";
 
 import { collectEvidence, isPromptAttack, safeOutput, SYSTEM_PROMPT } from "./policy.js";
 import { resolveReferenceRequest } from "./references.js";
+import { isCompletedComparison, toolContext } from "./toolContext.js";
 import { AgentError, type AgentReply, type ChatAgent, type LanguageModel, type ModelMessage, type ToolGateway } from "./types.js";
 
 export class MovieAgent implements ChatAgent {
@@ -33,10 +34,12 @@ export class MovieAgent implements ChatAgent {
     messages.push({ role: "user", content: input.content });
     const movies = new Map<number, MovieCard>();
     const session = await this.gateway.open(input.signal);
+    let comparisonComplete = false;
     try {
       for (let step = 0; step < this.maxSteps; step += 1) {
         input.signal.throwIfAborted();
-        const reply = await this.model.complete(messages, session.tools, input.signal);
+        const offeredTools = comparisonComplete ? [] : session.tools;
+        const reply = await this.model.complete(messages, offeredTools, input.signal);
         input.signal.throwIfAborted();
         if (reply.toolCalls.length === 0) {
           if (!safeOutput(reply.content)) { throw new AgentError("policy_denied"); }
@@ -45,7 +48,7 @@ export class MovieAgent implements ChatAgent {
         if (reply.toolCalls.length > 3) { throw new AgentError("limit_exceeded"); }
         messages.push({ role: "assistant", content: "", toolCalls: reply.toolCalls });
         for (const call of reply.toolCalls) {
-          if (!session.tools.some((tool) => tool.name === call.name)) { throw new AgentError("policy_denied"); }
+          if (!offeredTools.some((tool) => tool.name === call.name)) { throw new AgentError("policy_denied"); }
           const result = await session.call(call, input.signal);
           // Las páginas grandes no deben llenar el contexto ni ofrecer películas sin tarjeta.
           const raw = result.data;
@@ -58,8 +61,9 @@ export class MovieAgent implements ChatAgent {
             const evidence = collectEvidence(data);
             evidence.movies.forEach((movie) => { movies.delete(movie.id); movies.set(movie.id, movie); });
             evidence.references.forEach((reference) => references.set(`${reference.provider}:${reference.id}`, reference));
+            comparisonComplete ||= isCompletedComparison(call.name, data);
           }
-          messages.push({ role: "tool", toolName: call.name, content: JSON.stringify({ trust: "untrusted_external", isError: result.isError, data }) });
+          messages.push({ role: "tool", toolName: call.name, ...(call.id === undefined ? {} : { toolCallId: call.id }), content: JSON.stringify({ trust: "untrusted_external", isError: result.isError, data: toolContext(data) }) });
         }
       }
       throw new AgentError("limit_exceeded");

@@ -2,7 +2,9 @@ export interface ApiConfig {
   readonly host: string;
   readonly port: number;
   readonly origins: readonly string[];
-  readonly mode: "ollama" | "fixture";
+  readonly mode: "ollama" | "groq" | "fixture";
+  readonly groqApiKey: string;
+  readonly groqModel: string;
   readonly toolsMode: "mcp" | "fixture";
   readonly mcpUrl: string;
   readonly ollamaUrl: string;
@@ -29,7 +31,11 @@ export function loadApiConfig(env: Readonly<Record<string, string | undefined>>)
   const mode = env.AGENT_MODE ?? "ollama";
   const toolsMode = env.TOOLS_MODE ?? "mcp";
   const sessionStore = env.SESSION_STORE ?? "memory";
-  if (mode !== "ollama" && mode !== "fixture") { throw new Error("Invalid AGENT_MODE"); }
+  if (mode !== "ollama" && mode !== "groq" && mode !== "fixture") { throw new Error("Invalid AGENT_MODE"); }
+  const groqApiKey = env.GROQ_API_KEY?.trim() ?? "";
+  const groqModel = env.GROQ_MODEL?.trim() ?? "openai/gpt-oss-20b";
+  if (mode === "groq" && !groqApiKey) { throw new Error("GROQ_API_KEY is required"); }
+  if (!groqModel || groqModel.length > 100) { throw new Error("Invalid GROQ_MODEL"); }
   if (toolsMode !== "mcp" && toolsMode !== "fixture") { throw new Error("Invalid TOOLS_MODE"); }
   if (toolsMode === "fixture" && mode !== "fixture") { throw new Error("Fixture tools require AGENT_MODE=fixture"); }
   if (sessionStore !== "memory" && sessionStore !== "redis") { throw new Error("Invalid SESSION_STORE"); }
@@ -42,7 +48,7 @@ export function loadApiConfig(env: Readonly<Record<string, string | undefined>>)
     host: env.CHAT_HOST ?? "127.0.0.1", port: integer("CHAT_PORT", 8000, 65535), origins, mode, toolsMode,
     mcpUrl: endpoint("MCP_URL", "http://127.0.0.1:8001/mcp"),
     ollamaUrl: endpoint("OLLAMA_URL", "http://127.0.0.1:11434"), ollamaModel,
-    sessionStore, redisUrl: env.REDIS_URL,
+    sessionStore, redisUrl: env.REDIS_URL, groqApiKey, groqModel,
     sessionTtlMs: integer("SESSION_TTL_MS", 1800000), turnTimeoutMs: integer("TURN_TIMEOUT_MS", 60000, 300000),
     maxConnections: integer("MAX_CONNECTIONS", 64, 10000), maxConcurrentTurns: integer("MAX_CONCURRENT_TURNS", 4, 1000)
   };
