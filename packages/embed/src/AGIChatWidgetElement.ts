@@ -138,7 +138,7 @@ export class AGIChatWidgetElement extends HTMLElement {
 
     const props: ChatWidgetProps = {
       transport: this.transport,
-      showTmdbCredits: this.hasAttribute("tmdb-credits"),
+      ...(this.hasAttribute("tmdb-credits") ? { showTmdbCredits: true } : {}),
       suggestions: this.welcomeSuggestions,
       layout: this.getAttribute("layout") === "full" ? "full" : "widget",
       ...(title !== null ? { title } : {}),

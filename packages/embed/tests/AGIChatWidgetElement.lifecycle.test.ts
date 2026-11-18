@@ -22,6 +22,25 @@ afterEach(() => {
 });
 
 describe("Embed connection ownership", () => {
+  it("shows credits when requested and keeps automatic attribution for recommendations without the attribute", () => {
+    const element = new AGIChatWidgetElement();
+    const transport = interactiveTransport();
+    element.transport = transport;
+    append(element);
+    const credits = () => element.shadowRoot?.querySelector("[aria-label='Créditos de TMDB']");
+    expect(credits()).toBeNull();
+    act(() => { element.setAttribute("tmdb-credits", ""); });
+    expect(credits()).not.toBeNull();
+    act(() => { element.removeAttribute("tmdb-credits"); });
+    expect(credits()).toBeNull();
+    act(() => transport.emit({ type: "agent-message", message: {
+      id: "movie", content: "Una película para ti.", timestamp: new Date(),
+      cards: [{ id: "1", title: "Película", subtitle: null, image: null }]
+    } }));
+    expect(credits()).not.toBeNull();
+    expect(transport.subscribe).toHaveBeenCalledOnce();
+  });
+
   it("keeps history and subscription when presentation attributes and theme change", () => {
     const element = new AGIChatWidgetElement();
     const transport = interactiveTransport();

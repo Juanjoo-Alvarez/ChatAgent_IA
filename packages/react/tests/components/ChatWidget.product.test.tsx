@@ -31,4 +31,40 @@ describe("Movie widget experience", () => {
     act(() => transport.emit({ type: "transport-error", error: new Error("La sesión expiró.") }));
     expect(screen.getByRole("alert")).toHaveTextContent("La sesión expiró.");
   });
+
+  it("keeps enabled credits outside the conversation from the first render through session changes", () => {
+    const transport = new FakeTransportAdapter();
+    const { rerender } = render(<ChatWidget transport={transport} showTmdbCredits sessionId="first" />);
+    const credits = screen.getByRole("complementary", { name: "Créditos de TMDB" });
+    expect(credits).toBeVisible();
+    expect(screen.getByRole("log")).not.toContainElement(credits);
+    expect(screen.getByRole("textbox").closest("form")).not.toContainElement(credits);
+    act(() => {
+      transport.emit({ type: "connection-state", status: "disconnected" });
+      transport.emit({ type: "agent-message", message: {
+        id: "text", content: "Hola, soy Sofía.", timestamp: new Date()
+      } });
+    });
+    expect(credits).toBeVisible();
+    rerender(<ChatWidget transport={transport} showTmdbCredits sessionId="second" />);
+    expect(screen.getByRole("log")).toHaveTextContent("¿En qué puedo ayudarte?");
+    expect(credits).toBeVisible();
+  });
+
+  it("lets consumers explicitly hide credits even after recommendations and toggle them without losing history", () => {
+    const transport = new FakeTransportAdapter();
+    const { rerender } = render(<ChatWidget transport={transport} showTmdbCredits={false} />);
+    expect(screen.queryByLabelText("Créditos de TMDB")).toBeNull();
+    act(() => transport.emit({ type: "agent-message", message: {
+      id: "movie", content: "Una película para ti.", timestamp: new Date(),
+      cards: [{ id: "1", title: "Película", subtitle: null, image: null }]
+    } }));
+    expect(screen.queryByLabelText("Créditos de TMDB")).toBeNull();
+    rerender(<ChatWidget transport={transport} showTmdbCredits />);
+    expect(screen.getByLabelText("Créditos de TMDB")).toBeVisible();
+    rerender(<ChatWidget transport={transport} showTmdbCredits={false} />);
+    expect(screen.queryByLabelText("Créditos de TMDB")).toBeNull();
+    expect(screen.getByText("Una película para ti.")).toBeVisible();
+    expect(transport.subscriberCount).toBe(1);
+  });
 });
