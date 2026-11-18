@@ -16,8 +16,10 @@ GOOGLE_BOOKS_TIMEOUT_MS=8000
 QUOTA_GOOGLE_BOOKS=5/1s,300/1d
 ```
 
-La clave es opcional para metadatos públicos y permanece dentro del cliente
-HTTP. Nunca se incluye en resultados, errores o claves de caché. Los límites
+El cliente permite omitir la clave, pero la validación real sin clave recibió
+HTTP 429. Para reproducir la entrega, configura una clave con Books API habilitada
+y restringida a esa API. La clave permanece dentro del cliente HTTP.
+Nunca se incluye en resultados, errores o claves de caché. Los límites
 del ejemplo son un presupuesto local, no la cuota oficial asignada por Google;
 ajústalos a tu proyecto. La configuración TMDB/Redis del servicio sigue siendo
 necesaria. Libros está deshabilitado por defecto para mantener compatibles los
@@ -95,6 +97,43 @@ Errores públicos: `invalid_request`, `not_found`, `invalid_credentials`,
 error existente, sin cuerpos HTTP ni credenciales del proveedor.
 
 ## Verificación y casos para las evals de Juan José
+
+### Evidencia real de Daniel
+
+Desde la raíz, con credenciales locales en `apps/mcp-server/.env`:
+
+```bash
+pnpm --filter @agichat/mcp-server... build
+RUN_LIVE_BOOKS=1 pnpm --filter @agichat/mcp-server evidence:books:live
+```
+
+Este diagnóstico usa los clientes de producción con llamadas HTTP reales y
+sin fixtures. Ejecuta búsqueda y detalle en Google Books, obtiene Dune (2021)
+de TMDB si hay token, y compara ambos resultados. Usa por defecto el volumen
+`q_5WzQEACAAJ`; se puede elegir otra edición mediante `BOOKS_EVIDENCE_VOLUME_ID`.
+No requiere arrancar el backend ni un LLM: valida el módulo de Daniel, no el
+recorrido completo del agente.
+
+También inicia un servidor MCP temporal en localhost y conecta un cliente
+independiente por Streamable HTTP. Verifica descubrimiento, búsqueda, detalle y
+comparación usando la caché de las consultas reales; cierra la conexión y el
+servidor al terminar. No necesita otro servicio escuchando en el puerto 8001.
+
+La evidencia revisable de la entrega está en
+[BOOKS-EVIDENCIA.md](../../docs/BOOKS-EVIDENCIA.md).
+
+El reporte `evals/results/books-live-<fecha>.json` incluye estados HTTP,
+resultados, comparación y referencias, sin claves ni URLs de peticiones que
+puedan contenerlas. `complete: true` exige que pasen las consultas y la
+comparación fundamentada. Se requiere además revisión humana de las fuentes.
+Un resultado bloqueado o HTTP 429 no acredita la entrega terminada.
+
+El diagnóstico limita sus solicitudes, desactiva reintentos y utiliza caché
+en memoria nueva para no confundir datos anteriores con una consulta real.
+Su presupuesto local está separado del servicio; las llamadas sí consumen la
+cuota real del proveedor. No ejecutar en paralelo con una prueba de carga.
+Las pruebas de abajo verifican errores, timeouts y bloqueo de cuotas sin
+agotar deliberadamente la cuota externa.
 
 ```bash
 pnpm --filter @agichat/books test:coverage
