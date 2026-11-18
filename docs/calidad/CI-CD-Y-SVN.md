@@ -68,7 +68,7 @@ y repetible que está listo para entregarse cuando el equipo lo apruebe.
 ### ¿Cómo se usa en AGIChat?
 
 AGIChat aplica este enfoque en `.github/workflows/release.yml` y
-`docs/RELEASING.md`:
+`docs/calidad/RELEASING.md`:
 
 1. los cambios llegan a `main` mediante pull requests revisados;
 2. Release Please crea o actualiza un pull request de versión;
