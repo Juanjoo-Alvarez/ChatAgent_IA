@@ -1,5 +1,10 @@
 # Proyecto 2 — reparto de trabajo y plan de integración
 
+> **Documento histórico.** Es el plan inicial del 27 de octubre de 2026 y no
+> refleja la arquitectura final. Por ejemplo, proponía dos servidores MCP; el
+> producto final usa uno solo con 6 herramientas. La arquitectura vigente está en
+> [ALTO-NIVEL.md](../arquitectura/ALTO-NIVEL.md) y [AGENTE.md](../arquitectura/AGENTE.md).
+
 Curso: CC3116, Universidad del Valle de Guatemala. Fecha: 27 de octubre de 2026.
 
 Equipo: Juan Jose Rivas Alvarez (carnet 24856), Saúl, Daniel, José e Isma.
@@ -11,8 +16,8 @@ No se fijan fechas de entrega porque no se ha proporcionado el calendario del cu
 Es el plan inicial del 27 de octubre, conservado como referencia del reparto y
 las dependencias. Las rutas propuestas y los hitos describen ese momento; no son
 una lista actual de pendientes ni los diagramas finales de entrega. Para el
-arranque y los contratos implementados, consultar [BACKEND-AGENTE.md](./BACKEND-AGENTE.md),
-[OLLAMA-INICIO.md](./OLLAMA-INICIO.md) y [WIDGET-INTEGRACION.md](./WIDGET-INTEGRACION.md).
+arranque y los contratos implementados, consultar [AGENTE.md](../arquitectura/AGENTE.md),
+[ARRANQUE.md](../manuales/ARRANQUE.md) y [WIDGET-SDK.md](../manuales/WIDGET-SDK.md).
 
 ## Punto de partida comprobado el 27 de octubre de 2026
 
