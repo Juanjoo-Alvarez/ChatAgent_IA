@@ -14,7 +14,7 @@ if (process.argv.includes("--list")) {
 } else {
   const provider = process.env.AGENT_MODE ?? "ollama";
   if (!["ollama", "groq"].includes(provider)) { throw new Error("Live evals require AGENT_MODE=ollama or groq"); }
-  const model = provider === "groq" ? process.env.GROQ_MODEL ?? "openai/gpt-oss-20b" : process.env.OLLAMA_MODEL ?? "qwen3:4b-instruct-2507-q4_K_M";
+  const model = provider === "groq" ? process.env.GROQ_MODEL ?? "openai/gpt-oss-120b" : process.env.OLLAMA_MODEL ?? "qwen3:4b-instruct-2507-q4_K_M";
   const languageModel = provider === "groq" ? new GroqModel({ apiKey: process.env.GROQ_API_KEY ?? "", model })
     : new OllamaModel({ url: process.env.OLLAMA_URL ?? "http://127.0.0.1:11434", model });
   const agent = new MovieAgent(languageModel, new McpGateway(process.env.MCP_URL ?? "http://127.0.0.1:8001/mcp"));

@@ -10,6 +10,11 @@ describe("API configuration", () => {
     expect(loadApiConfig({ SESSION_STORE: "redis", REDIS_URL: "redis://localhost:6379" }).sessionStore).toBe("redis");
     expect(loadApiConfig({ OLLAMA_MODEL: " custom-model " }).ollamaModel).toBe("custom-model");
   });
+  it("defaults Groq to gpt-oss-120b and accepts an override", () => {
+    // gpt-oss-20b inventó IDs y agotó los pasos en la comparación de Dune.
+    expect(loadApiConfig({ AGENT_MODE: "groq", GROQ_API_KEY: "test" }).groqModel).toBe("openai/gpt-oss-120b");
+    expect(loadApiConfig({ AGENT_MODE: "groq", GROQ_API_KEY: "test", GROQ_MODEL: " qwen/qwen3.8-27b " }).groqModel).toBe("qwen/qwen3.8-27b");
+  });
   it.each([
     { AGENT_MODE: "groq" }, { AGENT_MODE: "groq", GROQ_API_KEY: " " }, { GROQ_MODEL: " " },
     { AGENT_MODE: "groq", GROQ_API_KEY: "test", TOOLS_MODE: "fixture" },

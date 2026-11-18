@@ -10,7 +10,7 @@ El frontend recibe `mode: "groq"`; reconstruir también la demo al actualizar.
 Crear una clave en <https://console.groq.com/keys>, conservando el plan gratuito
 y sin agregar tarjeta, según la consigna del curso. Consultar los modelos y
 cuotas disponibles en la cuenta antes de la demostración. El modelo inicial
-configurado es `openai/gpt-oss-20b`, intercambiable mediante `GROQ_MODEL`.
+configurado es `openai/gpt-oss-120b`, intercambiable mediante `GROQ_MODEL`.
 
 En `apps/api/.env` (ignorado por Git):
 
@@ -18,7 +18,7 @@ En `apps/api/.env` (ignorado por Git):
 AGENT_MODE=groq
 TOOLS_MODE=mcp
 GROQ_API_KEY=REEMPLAZAR_LOCALMENTE
-GROQ_MODEL=openai/gpt-oss-20b
+GROQ_MODEL=openai/gpt-oss-120b
 ```
 
 Conservar las direcciones MCP y Redis y los orígenes permitidos existentes.
