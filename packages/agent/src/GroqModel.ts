@@ -13,6 +13,7 @@ const responseSchema = z.object({ choices: z.array(z.object({
 
 const toolValidationErrorSchema = z.object({ error: z.object({ code: z.literal("tool_use_failed") }) });
 const truncatedResponseSchema = z.object({ choices: z.array(z.object({ finish_reason: z.literal("length") })).length(1) });
+const MAX_RATE_LIMIT_RETRY_SECONDS = 5;
 const toolCorrection = {
   role: "system",
   content: "La llamada anterior no cumplió el esquema de las herramientas. Genera una llamada válida usando únicamente las herramientas disponibles y los tipos definidos en su esquema. Si un parámetro opcional no tiene valor, omite la propiedad; no envíes null. No inventes resultados de herramientas."
@@ -85,7 +86,7 @@ export class GroqModel implements LanguageModel {
             remainingTokens: remaining("x-ratelimit-remaining-tokens")
           });
           await response.body?.cancel();
-          if (attempt < 2 && Number.isFinite(seconds) && seconds >= 0 && seconds <= 30) {
+          if (attempt < 2 && Number.isFinite(seconds) && seconds >= 0 && seconds <= MAX_RATE_LIMIT_RETRY_SECONDS) {
             await delay(Math.max(250, seconds * 1000 + 250), undefined, { signal });
             continue;
           }

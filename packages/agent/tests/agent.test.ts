@@ -14,6 +14,86 @@ describe("MovieAgent", () => {
     expect(f.model.complete).toHaveBeenLastCalledWith(expect.arrayContaining([expect.objectContaining({ role: "tool", content: expect.stringContaining('"trust":"untrusted_external"') })]), f.session.tools, expect.any(AbortSignal));
     expect(f.session.close).toHaveBeenCalledOnce();
   });
+  it("asks for preferences when the welcome prompt requests a question first", async () => {
+    const f = fixtures();
+    const reply = await new MovieAgent(f.model, f.gateway).respond({
+      content: "Recomiéndame una película. Me gustaría que primero me preguntaras por mis gustos.", history: [], signal: signal()
+    });
+    expect(reply.content).toContain("¿Qué géneros te gustan");
+    expect(f.gateway.open).not.toHaveBeenCalled();
+  });
+  it("recovers a genre recommendation when the model omits its MCP call", async () => {
+    const f = fixtures([
+      { content: "Prueba una película inventada.", toolCalls: [] },
+      { content: "Marea alta puede interesarte.", toolCalls: [] }
+    ]);
+    vi.mocked(f.session.call).mockResolvedValue({ isError: false, data: { candidates: [{ ...movie, genres: ["Ciencia ficción"], rating: 7.8, vote_count: 1200 }] } });
+    const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Recomiéndame ciencia ficción", history: [], signal: signal() });
+    expect(f.session.call).toHaveBeenCalledWith(expect.objectContaining({ name: "recommend_movies", arguments: { genres: [878], genre_match: "any" } }), expect.any(AbortSignal));
+    expect(reply.content).toContain("Te recomiendo Marea alta (2018)");
+    expect(reply.content).toContain("Ciencia ficción");
+    expect(reply.content).toContain("7.8/10");
+    expect(reply.content).not.toContain("inventada");
+    expect(reply.movies).toHaveLength(1);
+  });
+  it("keeps the recommendation intent when the user answers the welcome question", async () => {
+    const f = fixtures([{ content: "Podría interesarte algo.", toolCalls: [] }]);
+    const reply = await new MovieAgent(f.model, f.gateway).respond({
+      content: "Me gusta la ciencia ficción", history: [{
+        user: "Recomiéndame una película. Me gustaría que primero me preguntaras por mis gustos.",
+        assistant: "¿Qué géneros te gustan y qué ánimo buscas hoy? También puedes decirme una película que hayas disfrutado.",
+        references: []
+      }], signal: signal()
+    });
+    expect(f.session.call).toHaveBeenCalledWith(expect.objectContaining({ arguments: { genres: [878], genre_match: "any" } }), expect.any(AbortSignal));
+    expect(reply.content).toContain("Te recomiendo Marea alta");
+  });
+  it("uses MCP to answer a recommendation and book check when Groq is rate limited", async () => {
+    const f = fixtures();
+    vi.mocked(f.model.complete).mockRejectedValue(new AgentError("rate_limited"));
+    vi.mocked(f.gateway.open).mockResolvedValue({ ...f.session, tools: [
+      ...f.session.tools,
+      { name: "search_books", description: "", inputSchema: { type: "object" } },
+      { name: "compare_movie_book", description: "", inputSchema: { type: "object" } }
+    ] });
+    vi.mocked(f.session.call).mockImplementation(async (call) => {
+      if (call.name === "recommend_movies") { return { isError: false, data: { candidates: [{ ...movie, original_title: "Marea alta", genres: ["Acción"] }] } }; }
+      if (call.name === "search_books") { return { isError: false, data: { results: [{ id: "Book_501", title: "Marea alta", authors: ["Autora"] }] } }; }
+      return { isError: false, data: { status: "adaptation_identified", movie, sources: ["https://example.org/evidence"],
+        book: { id: "Book_501", title: "Marea alta", authors: ["Autora"] }, references: [{ provider: "google-books", id: "Book_501" }] } };
+    });
+    const reply = await new MovieAgent(f.model, f.gateway).respond({
+      content: "Ahora recomiéndame una película de acción y dime si es adaptación de un libro", history: [], signal: signal()
+    });
+    expect(f.session.call).toHaveBeenNthCalledWith(1, { name: "recommend_movies", arguments: { genres: [28], genre_match: "any" } }, expect.any(AbortSignal));
+    expect(f.session.call).toHaveBeenNthCalledWith(2, { name: "search_books", arguments: { query: "Marea alta" } }, expect.any(AbortSignal));
+    expect(f.session.call).toHaveBeenNthCalledWith(3, { name: "compare_movie_book", arguments: { movie_id: 501, book_id: "Book_501" } }, expect.any(AbortSignal));
+    expect(reply.content).toContain("Te recomiendo Marea alta");
+    expect(reply.content).toContain("La evidencia consultada identifica esta adaptación");
+    expect(reply.movies).toHaveLength(1);
+    expect(reply.references).toContainEqual({ provider: "google-books", id: "Book_501", label: "Marea alta" });
+    expect(f.session.close).toHaveBeenCalledOnce();
+  });
+  it("does not claim an adaptation from an unrelated book during rate-limit recovery", async () => {
+    const f = fixtures();
+    vi.mocked(f.model.complete).mockRejectedValue(new AgentError("rate_limited"));
+    vi.mocked(f.gateway.open).mockResolvedValue({ ...f.session, tools: [...f.session.tools, { name: "search_books", description: "", inputSchema: { type: "object" } }] });
+    vi.mocked(f.session.call).mockResolvedValueOnce({ isError: false, data: { candidates: [movie] } })
+      .mockResolvedValueOnce({ isError: false, data: { results: [{ id: "other", title: "Otro libro", authors: ["Autora"] }] } });
+    const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Recomiéndame una película de acción y dime si adapta un libro", history: [], signal: signal() });
+    expect(reply.content).toContain("No pude comprobar con evidencia");
+    expect(reply.content).not.toContain("identifica esta adaptación");
+    expect(f.session.call).toHaveBeenCalledTimes(2);
+  });
+  it("returns already verified movie evidence if Groq is limited after the MCP call", async () => {
+    const f = fixtures();
+    vi.mocked(f.model.complete).mockResolvedValueOnce(recommendCall).mockRejectedValueOnce(new AgentError("rate_limited"));
+    const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Recomiéndame ciencia ficción", history: [], signal: signal() });
+    expect(reply.content).toContain("Te recomiendo Marea alta");
+    expect(reply.movies[0]?.id).toBe(movie.id);
+    expect(f.session.call).toHaveBeenCalledOnce();
+    expect(f.session.close).toHaveBeenCalledOnce();
+  });
   it("passes bounded conversation context and preserves known references", async () => {
     const f = fixtures();
     const history = Array.from({ length: 12 }, (_, i) => ({ user: `user ${i}`, assistant: `reply ${i}`, references: [{ provider: "imdb" as const, id: "tt9950101" }] }));

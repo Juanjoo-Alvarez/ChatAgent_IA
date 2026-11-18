@@ -32,7 +32,7 @@ describe("Public widget connected to HTTP/WebSocket API", () => {
     const popups = Array.from({ length: 2 }, () => ({ opener: {}, closed: false, close: vi.fn(), location: { replace: vi.fn() } }));
     const open = vi.spyOn(window, "open").mockReturnValueOnce(popups[0] as unknown as Window).mockReturnValueOnce(popups[1] as unknown as Window);
     await send(host, "Recomienda una película");
-    await text(host, "Resultados de TMDB");
+    await text(host, "Te recomiendo Dune");
     expect(host.querySelector("img[alt='Póster de Dune']")?.getAttribute("src")).toBe(movie.poster);
     await send(host, "Compárala con el libro");
     await text(host, "La película cubre parte de la novela");

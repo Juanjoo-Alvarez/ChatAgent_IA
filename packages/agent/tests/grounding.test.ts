@@ -16,13 +16,14 @@ const comparison = { status: "adaptation_identified", movie, book, references: [
 const tools = ["recommend_movies", "search_books", "compare_movie_book", "get_movie_details"].map((name) => ({ name, description: "", inputSchema: { type: "object" } }));
 
 describe("MCP grounding regressions", () => {
-  it("requires MCP even when the model supplies a convincing recommendation", async () => {
+  it("recovers a recommendation from MCP when the model only supplies ungrounded text", async () => {
     const f = fixtures([final]);
     const reply = await new MovieAgent(f.model, f.gateway).respond({ content: "Recomiéndame una película", history: [], signal: signal() });
-    expect(reply.content).toContain("No dispongo de evidencia MCP");
+    expect(reply.content).toContain("Te recomiendo Marea alta");
     expect(reply.content).not.toContain("inventado");
-    expect(reply.movies).toEqual([]);
+    expect(reply.movies).toEqual([card]);
     expect(f.model.complete).toHaveBeenCalledTimes(2);
+    expect(f.session.call).toHaveBeenCalledOnce();
     expect(f.session.close).toHaveBeenCalledOnce();
   });
   it("recovers from a premature answer, using only catalog facts", async () => {

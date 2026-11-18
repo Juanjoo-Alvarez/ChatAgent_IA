@@ -98,7 +98,7 @@ describe("Groq inference", () => {
     await expect(modelWith(fetchImpl).complete([], [], signal())).rejects.toMatchObject({ code: "unavailable", message: "unavailable" });
     expect(fetchImpl).toHaveBeenCalledOnce();
   });
-  it.each([null, "invalid", "90", "-1"])("reports quota exhaustion without retrying an unsuitable delay %s", async (retryAfter) => {
+  it.each([null, "invalid", "6", "90", "-1"])("reports quota exhaustion without retrying an unsuitable delay %s", async (retryAfter) => {
     const headers = retryAfter === null ? {} : { "retry-after": retryAfter };
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response("private", { status: 429, headers }));
     await expect(modelWith(fetchImpl).complete([], [], signal())).rejects.toMatchObject({ code: "rate_limited" });
@@ -145,7 +145,7 @@ describe("Groq inference", () => {
   });
   it("cancels the quota wait without sending another request", async () => {
     const controller = new AbortController();
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response("", { status: 429, headers: { "retry-after": "30" } }));
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response("", { status: 429, headers: { "retry-after": "5" } }));
     const pending = modelWith(fetchImpl).complete([], [], controller.signal);
     const rejected = expect(pending).rejects.toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 10));

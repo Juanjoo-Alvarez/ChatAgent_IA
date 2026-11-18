@@ -19,8 +19,21 @@ export function updateContext(context: EvidenceContext, data: unknown): Evidence
   return { movies: movies.length ? movies : context.movies, books: books.length ? books : changedMovie ? [] : context.books };
 }
 
-export const comparisonRequested = (content: string): boolean => /compar|adaptacion|basad[ao].*libro|tiene libro|fidelidad|con el libro/i.test(content.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+export const comparisonRequested = (content: string): boolean => /compar|adapt|basad[ao].*libro|tiene libro|fidelidad|con el libro/i.test(content.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+export const recommendationRequested = (content: string): boolean => /recomiend|recomenda|recomen|sugier|suger|que (?:pelicula|ver)|cual (?:pelicula|ver)/i.test(content.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 export const contextualComparison = (content: string): boolean => /comp[aá]ral[ao]|con el libro|esa pel[ií]cula|esta pel[ií]cula/i.test(content);
+
+/** Solo se usan para recuperar candidatos cuando el modelo omite una llamada MCP. */
+export function fallbackRecommendationCriteria(content: string): Record<string, unknown> {
+  const normalized = content.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const genres: readonly [RegExp, number][] = [
+    [/ciencia ficcion/, 878], [/\bdrama\b/, 18], [/\bcomedia\b/, 35],
+    [/\bterror\b/, 27], [/\baccion\b/, 28], [/\banimacion\b/, 16],
+    [/\bromance\b/, 10749], [/\baventura\b/, 12], [/\bfantasia\b/, 14]
+  ];
+  const selected = genres.filter(([pattern]) => pattern.test(normalized) && !new RegExp(`(?:sin|no quiero) ${pattern.source}`).test(normalized)).map(([, id]) => id);
+  return selected.length ? { genres: selected, genre_match: "any" } : {};
+}
 
 /** Solo metadatos MCP seleccionan entidades; la prosa del modelo nunca crea IDs. */
 export function selectContext(context: EvidenceContext, content: string): EvidenceContext {
@@ -31,8 +44,24 @@ export function selectContext(context: EvidenceContext, content: string): Eviden
 }
 
 /** La respuesta factual se construye desde MCP, no desde afirmaciones libres del LLM. */
-export function groundedText(name: string, data: unknown): string {
+export function groundedText(name: string, data: unknown, recommendation = true): string {
   const record = object(data);
+  if (name === "recommend_movies" && recommendation) {
+    const candidates = Array.isArray(record.candidates) ? record.candidates : [];
+    const movies = candidates.flatMap((candidate) => {
+      const entry = object(candidate);
+      const title = text(entry.title);
+      return Number.isSafeInteger(entry.id) && title ? [{ title, year: entry.year, rating: entry.rating, votes: entry.vote_count, genres: texts(entry.genres) }] : [];
+    }).slice(0, 3);
+    if (movies.length === 0) { return "No encontré candidatos verificables con esos criterios. Prueba otro género o amplía tus preferencias."; }
+    const first = movies[0]!;
+    const title = `${first.title}${Number.isSafeInteger(first.year) ? ` (${first.year})` : ""}`;
+    const genre = first.genres.length ? ` TMDB la clasifica como ${first.genres.slice(0, 2).join(" y ")}.` : "";
+    const rating = typeof first.rating === "number" && first.rating >= 0 && first.rating <= 10 && Number.isSafeInteger(first.votes) && (first.votes as number) > 0
+      ? ` Tiene ${first.rating}/10 en TMDB con ${first.votes} votos.` : "";
+    const alternatives = movies.slice(1).map((movie) => `${movie.title}${Number.isSafeInteger(movie.year) ? ` (${movie.year})` : ""}`);
+    return `${record.source === "fixture" ? "En modo de prueba (sin LLM), te recomiendo" : "Te recomiendo"} ${title}.${genre}${rating}${alternatives.length ? ` Otras opciones: ${alternatives.join("; ")}.` : ""} Puedo compararla con su libro si existe.`;
+  }
   if (name === "compare_movie_book") {
     const verified = record.status === "adaptation_identified"
       && Array.isArray(record.sources) && record.sources.some((source) => typeof source === "string" && /^https:\/\//.test(source));

@@ -3,8 +3,8 @@ import type { MovieCard, Reference } from "@agichat/protocol";
 import { collectEvidence, isPromptAttack, safeOutput, SYSTEM_PROMPT } from "./policy.js";
 import { resolveReferenceRequest } from "./references.js";
 import { compactResult, isCompletedComparison, toolContext } from "./toolContext.js";
-import { comparisonRequested, contextualComparison, groundedText, selectContext, updateContext } from "./grounding.js";
-import { AgentError, type AgentReply, type ChatAgent, type EvidenceContext, type LanguageModel, type ModelMessage, type ToolGateway, type ToolResult } from "./types.js";
+import { comparisonRequested, contextualComparison, fallbackRecommendationCriteria, groundedText, recommendationRequested, selectContext, updateContext } from "./grounding.js";
+import { AgentError, type AgentReply, type ChatAgent, type EvidenceContext, type LanguageModel, type ModelMessage, type ToolGateway, type ToolResult, type ToolSession } from "./types.js";
 
 const stableKey = (value: unknown): string => JSON.stringify(value, (_key, entry: unknown) =>
   typeof entry === "object" && entry !== null && !Array.isArray(entry)
@@ -44,8 +44,67 @@ function referenceClarification(content: string, known: readonly Reference[]): s
 export class MovieAgent implements ChatAgent {
   public constructor(private readonly model: LanguageModel, private readonly gateway: ToolGateway, private readonly maxSteps = 5) {}
 
+  private async recommendWithoutModel(content: string, session: ToolSession, signal: AbortSignal, selected?: MovieCard, previousSummary?: string): Promise<AgentReply | null> {
+    if (selected === undefined && !session.tools.some((tool) => tool.name === "recommend_movies")) { return null; }
+    let data: unknown;
+    if (selected === undefined) {
+      const result = await session.call({ name: "recommend_movies", arguments: fallbackRecommendationCriteria(content) }, signal);
+      signal.throwIfAborted();
+      if (result.isError) { throw new AgentError("unavailable"); }
+      data = compactResult(result.data);
+    }
+    const candidate = selected ?? collectEvidence(data).movies[0];
+    const recommendation = previousSummary?.startsWith("Te recomiendo") === true || previousSummary?.startsWith("En modo de prueba") === true
+      ? previousSummary : groundedText("recommend_movies", selected === undefined ? data : { candidates: [{ id: selected.id, title: selected.title, year: selected.year }] });
+    if (candidate === undefined) { return { content: recommendation, movies: [], references: [], actions: [], context: { movies: [], books: [] } }; }
+    let movie = candidate;
+    let context: EvidenceContext = { movies: [movie], books: [] };
+    const references = new Map<string, Reference>();
+    if (movie.imdbId !== null) { references.set(`imdb:${movie.imdbId}`, { provider: "imdb", id: movie.imdbId }); }
+    let comparison = "";
+    if (comparisonRequested(content) && session.tools.some((tool) => tool.name === "search_books")) {
+      const raw = typeof data === "object" && data !== null ? data as Record<string, unknown> : {};
+      const first = Array.isArray(raw.candidates) && typeof raw.candidates[0] === "object" && raw.candidates[0] !== null
+        ? raw.candidates[0] as Record<string, unknown> : {};
+      const originalTitle = first.original_title;
+      const query = typeof originalTitle === "string" && originalTitle.length <= 300 && safeOutput(originalTitle) && !isPromptAttack(originalTitle) ? originalTitle : movie.title;
+      const bookResult = await session.call({ name: "search_books", arguments: { query } }, signal);
+      signal.throwIfAborted();
+      if (!bookResult.isError) {
+        const books = updateContext(context, compactResult(bookResult.data)).books;
+        const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLocaleLowerCase("es");
+        const match = books.find((book) => normalize(book.title) === normalize(query));
+        if (match !== undefined && session.tools.some((tool) => tool.name === "compare_movie_book")) {
+          const compared = await session.call({ name: "compare_movie_book", arguments: { movie_id: movie.id, book_id: match.id } }, signal);
+          signal.throwIfAborted();
+          if (!compared.isError) {
+            const comparedData = compactResult(compared.data);
+            comparison = groundedText("compare_movie_book", comparedData);
+            movie = collectEvidence(comparedData).movies.find((entry) => entry.id === movie.id) ?? movie;
+            context = { movies: [movie], books: [match] };
+            for (const reference of collectEvidence(comparedData).references) { references.set(`${reference.provider}:${reference.id}`, reference); }
+          }
+        }
+      }
+    }
+    if (comparisonRequested(content) && !comparison) { comparison = "No pude comprobar con evidencia si esta película adapta un libro."; }
+    if (movie.imdbId === null && session.tools.some((tool) => tool.name === "get_movie_details")) {
+      const details = await session.call({ name: "get_movie_details", arguments: { movie_id: movie.id } }, signal);
+      signal.throwIfAborted();
+      if (!details.isError) { movie = collectEvidence(details.data).movies.find((entry) => entry.id === movie.id) ?? movie; }
+      context = { ...context, movies: [movie] };
+    }
+    if (movie.imdbId !== null) { references.set(`imdb:${movie.imdbId}`, { provider: "imdb", id: movie.imdbId }); }
+    const introduction = comparisonRequested(content) ? recommendation.replace(/ Puedo compararla con su libro si existe\.$/, "") : recommendation;
+    const answer = `${introduction}${comparison ? ` ${comparison}` : ""}`;
+    if (!safeOutput(answer)) { throw new AgentError("policy_denied"); }
+    return { content: answer, movies: [movie], references: withReferenceLabels([...references.values()], [movie], context), actions: [], context };
+  }
+
   public async respond(input: Parameters<ChatAgent["respond"]>[0]): Promise<AgentReply> {
     input.signal.throwIfAborted();
+    const wantsRecommendation = recommendationRequested(input.content)
+      || input.history.at(-1)?.assistant.startsWith("¿Qué géneros te gustan y qué ánimo buscas hoy?") === true;
     let context: EvidenceContext = selectContext([...input.history].reverse().find((turn) => turn.context !== undefined)?.context ?? { movies: [], books: [] }, input.content);
     const references = new Map<string, Reference>();
     for (const turn of input.history.slice(-10)) {
@@ -66,6 +125,9 @@ export class MovieAgent implements ChatAgent {
     }
     if (/^(?:hola|buenas|gracias)[!.\s]*$/i.test(input.content.trim())) {
       return { content: "Puedo recomendar películas de TMDB, compararlas con libros y abrir referencias de IMDb o Google Books. ¿Qué título o género te interesa?", movies: [], references: [], actions: [], context };
+    }
+    if (recommendationRequested(input.content) && /primero.*pregunt.*gustos/i.test(input.content.normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) {
+      return { content: "¿Qué géneros te gustan y qué ánimo buscas hoy? También puedes decirme una película que hayas disfrutado.", movies: [], references: [], actions: [], context };
     }
     if (contextualComparison(input.content) && (context.movies.length > 1 || context.books.length > 1)) {
       return { content: "Hay varias obras posibles. Indica el título o el ID de la película y del libro que quieres comparar.", movies: context.movies, references: [...references.values()].slice(-20), actions: [], context };
@@ -88,8 +150,25 @@ export class MovieAgent implements ChatAgent {
       for (let step = 0; step < this.maxSteps; step += 1) {
         input.signal.throwIfAborted();
         const offeredTools = comparisonComplete ? [] : session.tools.filter((tool) => tool.name !== "compare_movie_book" || comparisonRequested(input.content));
-        const reply = await this.model.complete(messages, offeredTools, input.signal);
+        let reply;
+        try { reply = await this.model.complete(messages, offeredTools, input.signal); }
+        catch (error) {
+          if (error instanceof AgentError && error.code === "rate_limited" && wantsRecommendation) {
+            if (summary && safeOutput(summary) && (!comparisonRequested(input.content) || compared)) {
+              return { content: summary, movies: [...movies.values()].slice(-5), references: withReferenceLabels([...references.values()], [...movies.values(), ...context.movies], context).slice(-20), actions: [], context };
+            }
+            const fallback = await this.recommendWithoutModel(input.content, session, input.signal, movies.values().next().value, summary || undefined);
+            if (fallback !== null) { return fallback; }
+          }
+          throw error;
+        }
         input.signal.throwIfAborted();
+        if (reply.toolCalls.length === 0 && !summary && !evidenceRequested && wantsRecommendation
+          && offeredTools.some((tool) => tool.name === "recommend_movies") && step + 1 < this.maxSteps) {
+          if (!safeOutput(reply.content)) { throw new AgentError("policy_denied"); }
+          evidenceRequested = true;
+          reply = { content: "", toolCalls: [{ id: `fallback-recommend-${step}`, name: "recommend_movies", arguments: fallbackRecommendationCriteria(input.content) }] };
+        }
         if (reply.toolCalls.length === 0) {
           if (!safeOutput(reply.content)) { throw new AgentError("policy_denied"); }
           if ((!summary || (comparisonRequested(input.content) && !compared && session.tools.some((tool) => tool.name === "compare_movie_book"))) && !evidenceRequested && step + 1 < this.maxSteps) {
@@ -154,7 +233,7 @@ export class MovieAgent implements ChatAgent {
                 }
               }
             }
-            if (!compared || call.name === "compare_movie_book") { summary = groundedText(call.name, data); }
+            if (!compared || call.name === "compare_movie_book") { summary = groundedText(call.name, data, wantsRecommendation); }
             compared ||= call.name === "compare_movie_book";
             comparisonComplete ||= isCompletedComparison(call.name, data);
           }
